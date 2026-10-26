@@ -100,6 +100,10 @@ pub fn main_channels(s: &Session) -> usize {
     s.main_format().channels().clamp(MAIN_CHANNELS, MAX_CHANNELS)
 }
 
+/// Top of the clip effects gain slider; a stored or wired gain is clamped to it (#884).
+pub const CLIP_FX_MAX_GAIN_DB: f32 = 24.0;
+/// Top of a send fader, the same +12 dB `AutoParam::SendLevel` ranges up to (#884).
+pub const SEND_LEVEL_MAX_DB: f32 = 12.0;
 /// Renders sessions. Keep one per playback stream; plugin state persists across blocks.
 pub struct MixEngine {
     sample_rate: f32,

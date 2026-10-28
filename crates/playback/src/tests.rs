@@ -135,6 +135,7 @@ fn spike_session(spike_at: usize) -> (Arc<Shared>, AudioState, std::sync::mpsc::
     let id = s.new_clip_id();
     s.track_mut(t).unwrap().playlist_mut().unwrap().clips.push(Clip::audio(id, "x", SourceId(5), 0, 0, 48_000));
     let shared = Arc::new(Shared {
+        midi_capture: midi::CaptureQueue::default(),
         position: AtomicI64::new(0),
         playing: AtomicBool::new(false),
         speed: AtomicU32::new(1000),
@@ -242,6 +243,7 @@ fn gain_reduction_keeps_its_maximum_until_taken() {
 #[test]
 fn a_block_that_panics_goes_silent_and_is_reported_once() {
     let shared = Shared {
+        midi_capture: midi::CaptureQueue::default(),
         position: AtomicI64::new(0),
         playing: AtomicBool::new(true),
         speed: AtomicU32::new(1000),
@@ -283,6 +285,7 @@ fn a_lost_or_stalled_device_is_reported_once() {
 fn audio_state_plays_and_stops_at_end() {
     let s = Arc::new(soundcraft_model::Session::default());
     let shared = Arc::new(Shared {
+        midi_capture: midi::CaptureQueue::default(),
         position: AtomicI64::new(0),
         playing: AtomicBool::new(false),
         speed: AtomicU32::new(1000),
@@ -301,6 +304,7 @@ fn audio_state_plays_and_stops_at_end() {
 fn short_device_callbacks_render_short_mix_blocks() {
     let s = Arc::new(soundcraft_model::Session::default());
     let shared = Arc::new(Shared {
+        midi_capture: midi::CaptureQueue::default(),
         position: AtomicI64::new(0),
         playing: AtomicBool::new(false),
         speed: AtomicU32::new(1000),
@@ -325,6 +329,7 @@ fn audio_output_state(format: soundcraft_model::ChannelFormat, channels: Vec<Vec
     let id = s.new_clip_id();
     s.track_mut(t).unwrap().playlist_mut().unwrap().clips.push(Clip::audio(id, "output", SourceId(5), 0, 0, frames as i64));
     let shared = Arc::new(Shared {
+        midi_capture: midi::CaptureQueue::default(),
         position: AtomicI64::new(0),
         playing: AtomicBool::new(false),
         speed: AtomicU32::new(1000),
@@ -432,6 +437,7 @@ fn surround_main_maps_to_device_channels_or_folds_down() {
     s.track_mut(t).unwrap().playlist_mut().unwrap().clips.push(Clip::audio(id, "x", SourceId(5), 0, 0, 48_000));
     let s = Arc::new(s);
     let shared = Arc::new(Shared {
+        midi_capture: midi::CaptureQueue::default(),
         position: AtomicI64::new(0),
         playing: AtomicBool::new(false),
         speed: AtomicU32::new(1000),
@@ -465,6 +471,7 @@ fn instances_arrive_with_the_session_and_leave_through_the_return_channel() {
     s.track_mut(t).unwrap().mixer.inserts[1] = Some(Insert::new("clap:test.fake"));
     let s = Arc::new(s);
     let shared = Arc::new(Shared {
+        midi_capture: midi::CaptureQueue::default(),
         position: AtomicI64::new(0),
         playing: AtomicBool::new(false),
         speed: AtomicU32::new(1000),
@@ -606,6 +613,7 @@ fn side_creates_each_missing_instance_once() {
 #[test]
 fn replaced_sessions_are_freed_on_the_ui_thread() {
     let shared = Arc::new(Shared {
+        midi_capture: midi::CaptureQueue::default(),
         position: AtomicI64::new(0),
         playing: AtomicBool::new(false),
         speed: AtomicU32::new(1000),
@@ -635,6 +643,7 @@ fn replaced_sessions_are_freed_on_the_ui_thread() {
 fn looping_wraps() {
     let s = Arc::new(soundcraft_model::Session::default());
     let shared = Arc::new(Shared {
+        midi_capture: midi::CaptureQueue::default(),
         position: AtomicI64::new(0),
         playing: AtomicBool::new(false),
         speed: AtomicU32::new(1000),
@@ -670,6 +679,7 @@ fn locate_while_playing_drops_the_old_position_audio() {
         }
         tr.mixer.inserts[0] = Some(ins);
         let shared = Arc::new(Shared {
+            midi_capture: midi::CaptureQueue::default(),
             position: AtomicI64::new(0),
             playing: AtomicBool::new(false),
             speed: AtomicU32::new(1000),
@@ -700,6 +710,7 @@ fn armed_tracks_are_heard_and_metered_after_playback_stops() {
     let t = s.add_track(TrackKind::Audio, ChannelFormat::Mono, None);
     s.track_mut(t).unwrap().mixer.record_arm = true;
     let shared = Arc::new(Shared {
+        midi_capture: midi::CaptureQueue::default(),
         position: AtomicI64::new(0),
         playing: AtomicBool::new(false),
         speed: AtomicU32::new(1000),
@@ -717,4 +728,59 @@ fn armed_tracks_are_heard_and_metered_after_playback_stops() {
     st.fill(&mut out, 2);
     assert!(out.iter().any(|x| x.abs() > 0.1), "the input is heard");
     assert!(shared.meters.lock().unwrap().tracks.get(&t).is_some_and(|m| m.peak[0] > 0.1), "and metered");
+}
+
+#[test]
+fn hardware_queue_routes_only_armed_tracks_and_stop_flushes_recording() {
+    use soundcraft_midi::live::{Event, Message, PortQueue};
+    use soundcraft_model::{ChannelFormat, Insert, TrackKind};
+    let mut s = Session::default();
+    let id = s.add_track(TrackKind::Instrument, ChannelFormat::Stereo, None);
+    let track = s.track_mut(id).unwrap();
+    track.instrument = Some(Insert::new("subtractive_synth"));
+    track.mixer.record_arm = true;
+    track.midi_input = Some("keyboard".into());
+    track.midi_channel = Some(2);
+    let other = s.add_track(TrackKind::Midi, ChannelFormat::Mono, None);
+    s.track_mut(other).unwrap().midi_input = Some("keyboard".into());
+    let shared = Arc::new(Shared {
+        midi_capture: midi::CaptureQueue::default(),
+        position: AtomicI64::new(0),
+        playing: AtomicBool::new(false),
+        speed: AtomicU32::new(1000),
+        meters: Mutex::new(MeterSnapshot::default()),
+    });
+    let (tx, rx) = channel();
+    let mut state = AudioState::new(rx, shared.clone(), Arc::new(s), 48000.0, channel().0);
+    let queue = Arc::new(PortQueue::default());
+    tx.send(Cmd::MidiPorts(vec![midi::Port { id: "keyboard".into(), queue: queue.clone() }], vec![])).unwrap();
+    tx.send(Cmd::Play { from: 48000, end: None, looped: None }).unwrap();
+    tx.send(Cmd::Recording(true)).unwrap();
+    let mut out = vec![0.0; 1024];
+    state.fill(&mut out, 2);
+    for bytes in [[0x91, 64, 100], [0x92, 60, 100]] {
+        queue.push(Event { timestamp_us: queue.now_us(), message: Message::parse(&bytes).unwrap() });
+    }
+    state.fill(&mut out, 2);
+    assert!(out.iter().any(|x| x.abs() > 0.0001));
+    // An unconsumed key release must be captured before Stop's boundary.
+    queue.push(Event { timestamp_us: queue.now_us(), message: Message::parse(&[0x82, 60, 45]).unwrap() });
+    tx.send(Cmd::Stop).unwrap();
+    state.fill(&mut out, 2);
+    let mut records = Vec::new();
+    while let Some(event) = shared.midi_capture.events.pop() {
+        records.push(event);
+    }
+    assert_eq!(records.len(), 3, "{records:?}");
+    assert!(matches!(records[0], RecordedMidi::Event {track, bytes: [0x92, 60, 100], sample} if track == id && sample >= 48000));
+    assert!(matches!(records[1], RecordedMidi::Event { bytes: [0x82, 60, 45], .. }));
+    assert!(matches!(records[2], RecordedMidi::Boundary { .. }));
+    queue.push(Event { timestamp_us: queue.now_us(), message: Message::parse(&[0x92, 64, 100]).unwrap() });
+    state.fill(&mut out, 2);
+    assert!(out.iter().any(|x| x.abs() > 0.0001), "armed instruments must play with transport stopped");
+    let mut disarmed = (*state.session).clone();
+    disarmed.track_mut(id).unwrap().mixer.record_arm = false;
+    tx.send(Cmd::Session(Arc::new(disarmed), vec![])).unwrap();
+    state.fill(&mut out, 2);
+    assert!(out.iter().all(|x| x.abs() < 0.0001), "disarming must release the monitored note");
 }

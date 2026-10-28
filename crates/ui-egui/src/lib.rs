@@ -58,6 +58,7 @@ pub use panels::video_window;
 pub use panels::windows;
 
 mod app;
+mod midi_hardware;
 mod services;
 mod state;
 
@@ -276,6 +277,7 @@ pub struct SoundApp {
     pub player: Option<Player>,
     /// Input capture, opened on first record.
     pub recorder: Option<soundcraft_playback::record::Recorder>,
+    pub(crate) midi_hardware: midi_hardware::State,
     record_start: Samples,
     /// Punch range to trim the take to (pre/post-roll recordings).
     punch: Option<Range>,

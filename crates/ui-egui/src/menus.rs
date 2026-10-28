@@ -66,6 +66,7 @@ pub const UI_COMMANDS: &[(&str, &str, &str, Option<&str>)] = &[
     ("window.midi_ops", "MIDI Operations", "", None),
     ("window.rtp", "MIDI Real-Time Properties", "", None),
     ("window.playback_engine", "Playback Engine", "", None),
+    ("ui.midi_hardware", "MIDI Hardware", "Setup > MIDI Hardware", None),
     ("ui.audio_device", "Audio Device", "", None),
     ("window.io_setup", "I/O Setup", "", None),
     ("window.shortcuts", "Keyboard Shortcuts", "", None),
@@ -439,6 +440,7 @@ fn params_for(path: &str, id: &str) -> Value {
 
 /// Menu items that open a WABTY Studio window when clicked (programmatic calls still run the command).
 const MENU_WINDOWS: &[(&str, &str)] = &[
+    ("Setup > MIDI Hardware", "ui.midi_hardware"),
     ("Setup > Appearance", "window.ui_customization"),
     ("Setup > Hardware...", "window.playback_engine"),
     ("Setup > Playback Engine...", "window.playback_engine"),
@@ -514,6 +516,10 @@ pub fn run_ui_command(app: &mut SoundApp, id: &str, p: &Value) -> Option<Result<
     }
     if let Some(v) = crate::extra_windows::run(app, id, p) {
         return Some(Ok(v));
+    }
+    if id == "ui.midi_hardware" {
+        app.midi_hardware.open = true;
+        return Some(Ok(json!({"open": true})));
     }
     if id == "ui.audio_device" {
         return Some(crate::windows::audio_device_command(app, p));

@@ -18,7 +18,67 @@ fn midi_offset(s: &Session, t: &Track) -> i64 {
 }
 
 /// Send note on/offs and controllers for MIDI clips overlapping the block.
-pub(crate) fn schedule_notes(s: &Session, t: &Track, pos: Samples, frames: usize, inst: &mut PluginSlot, held: &mut Vec<u8>) {
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn schedule_notes(
+    s: &Session,
+    t: &Track,
+    pos: Samples,
+    frames: usize,
+    inst: &mut PluginSlot,
+    held: &mut Vec<u8>,
+    gate: &mut soundcraft_midi::live::NoteGate,
+    events: &mut Vec<(usize, [u8; 3], usize)>,
+) {
+    events.clear();
+    let mut overflow = false;
+    visit_midi_events(s, t, pos, frames, |offset, msg| {
+        if events.len() < events.capacity() {
+            events.push((offset, msg, events.len()));
+        } else {
+            overflow = true;
+        }
+    });
+    if overflow {
+        inst.plugin.all_notes_off();
+        gate.clear();
+        held.clear();
+        return;
+    }
+    // Stable order for coincident events without sort's scratch allocation.
+    events.sort_unstable_by_key(|(offset, msg, order)| {
+        (
+            *offset,
+            match msg[0] & 0xf0 {
+                0xb0 => 0,
+                0x80 => 1,
+                _ => 2,
+            },
+            *order,
+        )
+    });
+    for &(offset, msg, _) in events.iter() {
+        let len = if matches!(msg[0] & 0xf0, 0xc0 | 0xd0) { 2 } else { 3 };
+        if let Some(message) = soundcraft_midi::live::Message::parse(&msg[..len]) {
+            gate.dispatch(message, |msg| match msg[0] & 0xf0 {
+                0x90 if msg[2] > 0 => {
+                    inst.plugin.note_on(offset, msg[1], msg[2]);
+                    if !held.contains(&msg[1]) && held.len() < 128 {
+                        held.push(msg[1]);
+                    }
+                }
+                0x80 | 0x90 => {
+                    inst.plugin.note_off(offset, msg[1]);
+                    held.retain(|p| *p != msg[1]);
+                }
+                0xb0 if matches!(msg[1], 120 | 123) => inst.plugin.all_notes_off(),
+                _ => inst.plugin.midi(offset, [msg[0] & 0xf0, msg[1], msg[2]]),
+            });
+        }
+    }
+}
+
+/// Visit channel messages in a timeline block without allocating. Events need not be ordered.
+pub fn visit_midi_events(s: &Session, t: &Track, pos: Samples, frames: usize, mut emit: impl FnMut(usize, [u8; 3])) {
     let sr = s.sample_rate;
     // MIDI Track Offsets: the track's notes sound `offset` samples later (earlier if negative), so
     // the block looks that far back into the clips.
@@ -30,7 +90,7 @@ pub(crate) fn schedule_notes(s: &Session, t: &Track, pos: Samples, frames: usize
             continue;
         }
         let ClipContent::Midi { sequence } = &clip.content else { continue };
-        if !clip.range().overlaps(&Range { start: pos, end }) {
+        if clip.start >= end || clip.end() < pos {
             continue;
         }
         let base = s.tempo.samples_to_ticks(clip.start, sr);
@@ -66,14 +126,10 @@ pub(crate) fn schedule_notes(s: &Session, t: &Track, pos: Samples, frames: usize
                 continue;
             }
             if on >= pos && on < end {
-                inst.plugin.note_on(usize::try_from(on - pos).unwrap_or(0), n.pitch, n.velocity);
-                if !held.contains(&n.pitch) && held.len() < 128 {
-                    held.push(n.pitch);
-                }
+                emit(usize::try_from(on - pos).unwrap_or(0), [0x90 | (n.channel & 15), n.pitch, n.velocity]);
             }
             if off >= pos && off < end {
-                inst.plugin.note_off(usize::try_from(off - pos).unwrap_or(0), n.pitch);
-                held.retain(|p| *p != n.pitch);
+                emit(usize::try_from(off - pos).unwrap_or(0), [0x80 | (n.channel & 15), n.pitch, n.release_velocity]);
             }
         }
         // Events before tick 0 are what a start trim hid: they don't play.
@@ -84,7 +140,9 @@ pub(crate) fn schedule_notes(s: &Session, t: &Track, pos: Samples, frames: usize
             }
             let at = s.tempo.tick_to_samples(base.saturating_add(tick), sr);
             if at >= pos && at < end && at < clip.end() {
-                inst.plugin.midi(usize::try_from(at - pos).unwrap_or(0), ctrl_message(c.kind, c.value, dp));
+                let mut message = ctrl_message(c.kind, c.value, dp);
+                message[0] |= c.channel & 15;
+                emit(usize::try_from(at - pos).unwrap_or(0), message);
             }
         }
     }

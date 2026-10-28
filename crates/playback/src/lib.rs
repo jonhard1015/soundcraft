@@ -23,7 +23,9 @@
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
 pub mod devices;
+mod midi;
 pub mod record;
+pub use midi::RecordedMidi;
 
 pub use devices::AudioConfig;
 
@@ -113,6 +115,10 @@ pub type PluginStates = Vec<(TrackId, usize, Vec<u8>)>;
 pub type EditorEdit = (TrackId, usize, String, f32);
 
 enum Cmd {
+    MidiPorts(Vec<midi::Port>, Vec<midi::Port>),
+    MidiPanic,
+    MidiPunch(Option<Range>),
+    MidiResetCapture,
     /// A new snapshot plus the third-party instances it needs (created on the UI thread).
     Session(Arc<Session>, Vec<PreparedInstance>),
     /// Where the callback sends the snapshots it replaces (freeing one takes thousands of frees).
@@ -131,6 +137,7 @@ enum Cmd {
 }
 
 struct Shared {
+    midi_capture: midi::CaptureQueue,
     position: AtomicI64,
     playing: AtomicBool,
     /// Speed × 1000.
@@ -210,6 +217,7 @@ impl Player {
     /// the session rate.
     fn open(session: Arc<Session>, cfg: &AudioConfig) -> Player {
         let shared = Arc::new(Shared {
+            midi_capture: midi::CaptureQueue::default(),
             position: AtomicI64::new(0),
             playing: AtomicBool::new(false),
             speed: AtomicU32::new(1000),
@@ -381,6 +389,9 @@ impl Player {
     pub fn update_session(&self, s: Arc<Session>) {
         let (instances, gone) = {
             let mut side = self.side();
+            if side.midi.configure(&s) {
+                let _ = self.tx.send(Cmd::MidiPorts(side.midi.inputs.clone(), side.midi.outputs.clone()));
+            }
             (side.prepare(&s), side.gone_tracks(&s))
         };
         let _ = self.tx.send(Cmd::Session(s, instances));
@@ -481,11 +492,13 @@ impl Player {
     }
 
     pub fn stop(&self) {
+        self.silence_midi_hardware();
         self.shared.playing.store(false, Ordering::Relaxed);
         let _ = self.tx.send(Cmd::Stop);
     }
 
     pub fn locate(&self, at: Samples) {
+        self.silence_midi_hardware();
         self.shared.position.store(at, Ordering::Relaxed);
         let _ = self.tx.send(Cmd::Locate(at));
     }

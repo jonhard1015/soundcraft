@@ -272,6 +272,12 @@ impl Playlist {
 /// A track.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Track {
+    #[serde(default)]
+    pub midi_input: Option<String>,
+    #[serde(default)]
+    pub midi_output: Option<String>,
+    #[serde(default)]
+    pub midi_channel: Option<u8>,
     pub id: TrackId,
     pub name: String,
     pub kind: TrackKind,
@@ -327,6 +333,9 @@ impl Track {
             "volume"
         };
         Track {
+            midi_input: None,
+            midi_output: None,
+            midi_channel: None,
             id,
             playlists: vec![Playlist::new(name.clone())],
             name,

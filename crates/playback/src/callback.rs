@@ -80,6 +80,10 @@ pub(crate) struct AudioState {
     pub(crate) device_rate: f64,
     input: Option<Arc<record::InputRing>>,
     recording: bool,
+    midi_punch: Option<Range>,
+    midi_record_start: Samples,
+    midi_inputs: Vec<midi::Port>,
+    midi_outputs: Vec<midi::Port>,
     /// Retired plugin instances go back to the UI thread to be dropped there.
     garbage: Sender<Vec<Box<dyn Plugin>>>,
     old_sessions: Option<SyncSender<Arc<Session>>>,
@@ -125,6 +129,10 @@ impl AudioState {
             device_rate,
             input: None,
             recording: false,
+            midi_punch: None,
+            midi_record_start: 0,
+            midi_inputs: Vec::new(),
+            midi_outputs: Vec::new(),
             unsent: MeterSnapshot::default(),
             forget_shared: Vec::new(),
         }
@@ -134,6 +142,17 @@ impl AudioState {
         let mut changed = false;
         while let Ok(c) = self.rx.try_recv() {
             match c {
+                Cmd::MidiPunch(range) => self.midi_punch = range,
+                Cmd::MidiPorts(inputs, outputs) => {
+                    self.midi_boundary();
+                    self.midi_inputs = inputs;
+                    self.midi_outputs = outputs;
+                }
+                Cmd::MidiPanic => self.midi_boundary(),
+                Cmd::MidiResetCapture => {
+                    self.recording = false;
+                    self.shared.midi_capture.push(RecordedMidi::Reset);
+                }
                 Cmd::Input(r) => self.input = Some(r),
                 Cmd::Forget(gone) => {
                     self.unsent.forget(&gone);
@@ -144,8 +163,35 @@ impl AudioState {
                     }
                     self.forget_meters();
                 }
-                Cmd::Recording(r) => self.recording = r,
+                Cmd::Recording(r) => {
+                    if !r {
+                        self.midi_boundary();
+                    }
+                    self.recording = r;
+                    if r {
+                        self.midi_record_start = self.pos;
+                        self.midi_punch = None;
+                    }
+                }
                 Cmd::Session(s, instances) => {
+                    if self.session.tracks.iter().any(|old| old.mixer.solo != s.track(old.id).is_some_and(|new| new.mixer.solo)) {
+                        self.midi_boundary();
+                    }
+                    if self.session.tracks.iter().any(|old| {
+                        old.kind.is_midi()
+                            && !s.track(old.id).is_some_and(|new| {
+                                old.mixer.record_arm == new.mixer.record_arm
+                                    && old.inactive == new.inactive
+                                    && old.mixer.mute == new.mixer.mute
+                                    && old.mixer.solo == new.mixer.solo
+                                    && old.mixer.solo_safe == new.mixer.solo_safe
+                                    && old.midi_input == new.midi_input
+                                    && old.midi_output == new.midi_output
+                                    && old.midi_channel == new.midi_channel
+                            })
+                    }) {
+                        self.midi_boundary();
+                    }
                     changed = true;
                     if (s.sample_rate.as_f64() - self.session.sample_rate.as_f64()).abs() > 0.5 {
                         let mut old = std::mem::replace(&mut self.mix, new_engine(s.sample_rate.as_f64() as f32));
@@ -167,7 +213,11 @@ impl AudioState {
                 }
                 Cmd::OldSessions(tx) => self.old_sessions = Some(tx),
                 Cmd::Play { from, end, looped } => {
+                    self.midi_boundary();
                     self.pos = from;
+                    if self.recording {
+                        self.midi_record_start = from;
+                    }
                     self.end = end;
                     self.looped = looped.filter(|r| r.len() > 64);
                     self.playing = true;
@@ -176,12 +226,16 @@ impl AudioState {
                     self.mix.reset();
                 }
                 Cmd::Stop => {
+                    self.midi_boundary();
+                    self.pending_len = 0;
+                    self.read = 0.0;
                     self.playing = false;
                     self.end = None;
                     self.looped = None;
                     self.mix.reset();
                 }
                 Cmd::Locate(at) => {
+                    self.midi_boundary();
                     self.pos = at;
                     self.pending_len = 0;
                     self.read = 0.0;
@@ -198,6 +252,78 @@ impl AudioState {
         self.shared.playing.store(self.playing, Ordering::Relaxed);
     }
 
+    fn midi_boundary(&mut self) {
+        self.route_midi(0);
+        self.mix.reset();
+        self.mix.live_midi.clear();
+        for port in &self.midi_outputs {
+            port.queue.request_reset();
+        }
+        if self.recording {
+            self.shared.midi_capture.push(RecordedMidi::Boundary { sample: self.midi_punch.map_or(self.pos, |r| self.pos.min(r.end)) });
+        }
+    }
+
+    fn route_midi(&mut self, frames: usize) {
+        use soundcraft_midi::live::{Event, Message};
+        let rate = self.session.sample_rate.as_f64() * (f64::from(self.shared.speed.load(Ordering::Relaxed)) / 1000.0).clamp(0.1, 4.0);
+        let any_solo = self.session.tracks.iter().any(|t| t.mixer.solo && !t.inactive);
+        for port in &self.midi_inputs {
+            let now = port.queue.now_us();
+            for _ in 0..4096 {
+                let Some(event) = port.queue.pop() else {
+                    break;
+                };
+                let age = (now.saturating_sub(event.timestamp_us) as f64 * rate / 1_000_000.0) as i64;
+                let sample = self.pos.saturating_sub(age).max(0);
+                for track in self.session.tracks.iter().filter(|t| {
+                    t.kind.is_midi()
+                        && !t.inactive
+                        && t.mixer.record_arm
+                        && t.midi_input.as_ref() == Some(&port.id)
+                        && t.midi_channel.is_none_or(|ch| ch == event.message.channel())
+                }) {
+                    if self.mix.live_midi.len() < self.mix.live_midi.capacity() {
+                        self.mix.live_midi.push((track.id, event.message.raw()));
+                    } else {
+                        port.queue.request_reset();
+                    }
+                    if self.recording
+                        && self.playing
+                        && sample >= self.midi_record_start
+                        && self.midi_punch.is_none_or(|r| sample >= r.start && sample < r.end)
+                    {
+                        self.shared.midi_capture.push(RecordedMidi::Event { track: track.id, sample, bytes: event.message.raw() });
+                    }
+                    if !track.mixer.mute
+                        && (!any_solo || track.mixer.solo || track.mixer.solo_safe)
+                        && let Some(output) = self.midi_outputs.iter().find(|p| Some(&p.id) == track.midi_output.as_ref())
+                    {
+                        output.queue.push(Event { timestamp_us: output.queue.now_us(), message: event.message });
+                    }
+                }
+            }
+        }
+        if self.playing {
+            for track in self
+                .session
+                .tracks
+                .iter()
+                .filter(|t| t.kind.is_midi() && !t.inactive && !t.mixer.mute && (!any_solo || t.mixer.solo || t.mixer.solo_safe))
+            {
+                if let Some(output) = self.midi_outputs.iter().find(|p| Some(&p.id) == track.midi_output.as_ref()) {
+                    let now = output.queue.now_us();
+                    soundcraft_mix::visit_midi_events(&self.session, track, self.pos, frames, |offset, raw| {
+                        let len = if matches!(raw[0] & 0xf0, 0xc0 | 0xd0) { 2 } else { 3 };
+                        if let Some(message) = Message::parse(&raw[..len]) {
+                            output.queue.push(Event { timestamp_us: now.saturating_add((offset as f64 * 1_000_000.0 / rate) as u64), message });
+                        }
+                    });
+                }
+            }
+        }
+    }
+
     fn send_garbage(&mut self) {
         let g = self.mix.take_retired();
         if !g.is_empty() {
@@ -211,12 +337,17 @@ impl AudioState {
         if let Some(l) = self.looped
             && self.pos >= l.end
         {
+            self.midi_boundary();
             self.pos = l.start;
+            if self.recording {
+                self.midi_record_start = l.start;
+            }
         }
         if let Some(l) = self.looped {
             n = n.min(usize::try_from((l.end - self.pos).max(1)).unwrap_or(BLOCK));
         } else if let Some(e) = self.end {
             if self.pos >= e {
+                self.midi_boundary();
                 self.playing = false;
                 self.end = None;
                 self.shared.playing.store(false, Ordering::Relaxed);
@@ -239,9 +370,18 @@ impl AudioState {
             }
             ring.pop_into(&mut self.mix.input, n, self.session.sample_rate.hz());
         }
+        let mut reset = false;
+        for port in &self.midi_inputs {
+            reset |= port.queue.take_reset();
+        }
+        if reset {
+            self.midi_boundary();
+        }
+        self.route_midi(n);
         self.mix.monitor_only = !self.playing;
         self.mix.recording = self.recording;
         self.mix.render(&self.session, self.pos, n, &mut self.pending);
+        self.mix.live_midi.clear();
         self.send_garbage();
         self.pending_len = n;
         self.publish_meters();
@@ -276,7 +416,8 @@ impl AudioState {
     pub(crate) fn fill(&mut self, out: &mut [f32], channels: usize) {
         self.drain();
         let channels = channels.max(1);
-        let monitoring = self.input.is_some() && self.session.tracks.iter().any(|t| t.mixer.input_monitor || t.mixer.record_arm);
+        let monitoring =
+            !self.midi_inputs.is_empty() || (self.input.is_some() && self.session.tracks.iter().any(|t| t.mixer.input_monitor || t.mixer.record_arm));
         if !self.playing && !monitoring {
             out.iter_mut().for_each(|x| *x = 0.0);
             self.unsent.silence();
@@ -357,6 +498,7 @@ fn out_sample(v: f32) -> f32 {
 
 /// UI-thread bookkeeping of the third-party instances the audio thread holds.
 pub(crate) struct Side {
+    pub(crate) midi: midi::Hardware,
     /// What was last created for each slot: (plugin id, channels, created ok).
     pub(crate) shadow: HashMap<(TrackId, usize), (String, usize, bool)>,
     /// Session sample rate the instances were prepared for.
@@ -377,6 +519,7 @@ pub(crate) struct Side {
 impl Side {
     pub(crate) fn new(rate: f32, garbage: Receiver<Vec<Box<dyn Plugin>>>) -> Side {
         Side {
+            midi: midi::Hardware::default(),
             shadow: HashMap::new(),
             rate,
             editors: HashMap::new(),

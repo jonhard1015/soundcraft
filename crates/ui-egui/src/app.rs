@@ -26,6 +26,7 @@ impl SoundApp {
             engine,
             player,
             recorder: None,
+            midi_hardware: midi_hardware::State::default(),
             record_start: 0,
             punch: None,
             recorder_failed: false,
@@ -179,6 +180,7 @@ impl SoundApp {
         self.watch_input();
         // Stop the old playback before sending a replacement session to the audio thread.
         self.handle_transport(dt);
+        self.poll_midi_recording();
         if self.engine.revision != self.last_rev {
             self.last_rev = self.engine.revision;
             if let Some(p) = &self.player {
@@ -191,7 +193,12 @@ impl SoundApp {
         self.autosave();
         if self.recorder.is_none()
             && !self.recorder_failed
-            && self.engine.session().tracks.iter().any(|t| t.mixer.input_monitor || t.mixer.record_arm)
+            && self
+                .engine
+                .session()
+                .tracks
+                .iter()
+                .any(|t| t.kind == soundcraft_model::TrackKind::Audio && (t.mixer.input_monitor || t.mixer.record_arm))
         {
             self.ensure_input();
         }
@@ -199,7 +206,8 @@ impl SoundApp {
         // egui 0.37 schedules the delay as given (it no longer subtracts the predicted frame time),
         // so ask for the real interval instead of adding that time back.
         let editors = self.player.as_ref().is_some_and(Player::any_editor_open);
-        ctx.request_repaint_after_secs(if editors { 0.03 } else { 1.0 });
+        let midi_live = self.player.is_some() && self.engine.session().tracks.iter().any(|t| t.kind.is_midi() && t.mixer.record_arm);
+        ctx.request_repaint_after_secs(if editors || midi_live { 0.03 } else { 1.0 });
         crate::control::drain_screenshots(self, ctx);
         if crate::control::screenshots_need_paint(self) {
             // An admitted capture that has not reached a UI pass needs an explicit hidden paint;
@@ -323,6 +331,7 @@ impl SoundApp {
         video_window::show(self, &ctx);
         ops_windows::show(self, &ctx);
         extra_windows::show(self, &ctx);
+        midi_hardware::show(self, &ctx);
         recovery::show(self, &ctx);
         score_editor::show(self, &ctx);
         palette::show(self, &ctx);

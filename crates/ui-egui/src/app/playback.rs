@@ -100,8 +100,11 @@ impl SoundApp {
             self.record_hint = Some((self.last_frame.unwrap_or_default(), why));
             return;
         }
-        self.ensure_input();
-        let takes = match self.arm_recorder() {
+        let audio_armed = self.engine.session().tracks.iter().any(|t| t.kind == soundcraft_model::TrackKind::Audio && t.mixer.record_arm);
+        if audio_armed {
+            self.ensure_input();
+        }
+        let takes = match if audio_armed { self.arm_recorder() } else { Ok(Vec::new()) } {
             Ok(takes) => takes,
             Err(err) => {
                 self.ui.status = format!("Cannot record: {err}");
@@ -144,6 +147,9 @@ impl SoundApp {
     /// Remember where the armed `takes` go (split into passes of `pass` when loop recording) and
     /// autosave that plan with the session.
     fn plan_recording(&mut self, takes: Vec<soundcraft_engine::io::Take>, pass: Option<Samples>) {
+        if let Some(player) = &self.player {
+            player.set_midi_punch(self.punch);
+        }
         let rate = self.recorder.as_ref().map_or(0, |r| r.sample_rate);
         self.take_plan = Some(soundcraft_engine::io::Recording { start: self.record_start, pass, punch: self.punch, rate, takes });
         if let Some(root) = self.autosave_dir.clone() {
@@ -319,11 +325,13 @@ impl SoundApp {
         for r in reqs {
             match r {
                 TransportRequest::ResetSession => {
+                    self.midi_hardware.discard_until_boundary = true;
                     if let Some(p) = &self.player {
                         p.stop();
                         p.set_recording(false);
                         p.set_speed(1.0);
                         p.locate(self.engine.transport.position);
+                        p.reset_midi_capture();
                     }
                     self.sim = None;
                     // The old capture belongs to the replaced document, never to the new one.
@@ -396,7 +404,11 @@ impl SoundApp {
                     self.play_from_selection();
                 }
                 TransportRequest::Scrub(at) => self.engine.transport.position = at,
-                TransportRequest::AllNotesOff => {}
+                TransportRequest::AllNotesOff => {
+                    if let Some(p) = &self.player {
+                        p.midi_panic();
+                    }
+                }
             }
         }
         // Read back the position.

@@ -1,6 +1,6 @@
 # Where WABTY Studio falls short of Pro Tools
 
-> **Last reviewed:** 2026-10-19 · **Last updated:** 2026-10-27 · **Change:** trivial (WABTY Studio rebrand; readiness unchanged) · **Target:** Avid Pro Tools Ultimate 2026.4.1
+> **Last reviewed:** 2026-10-19 · **Last updated:** 2026-10-27 · **Change:** minor (native MIDI implementation; hardware validation pending) · **Target:** Avid Pro Tools Ultimate 2026.4.1
 
 Every known shortfall, one entry each, ranked by how much it stops a Pro Tools user from doing
 real work in WABTY Studio. This is the work list: pick from the top. Rows marked **alpha blocker**
@@ -16,7 +16,7 @@ When you close a gap, delete its entry (or shrink it) in the same PR, and bump t
 | # | Gap | Dimension | Doc | Est. (h) |
 |---|---|---|---|---:|
 | G-01 | **Alpha blocker.** No channel routing or duplex low-latency path (device, rate and buffer choice done; ASIO opt-in) | Hardware | [hardware-parity.md](hardware-parity.md) | 15–25 |
-| G-02 | **Alpha blocker.** No MIDI device input or output | Hardware / MIDI | [hardware-parity.md](hardware-parity.md) | 20–35 |
+| G-02 | **Alpha gate validation pending.** MIDI hardware implementation needs physical-device verification | Hardware / MIDI | [hardware-parity.md](hardware-parity.md) | 20–35 |
 | G-03 | **Alpha blocker.** Cannot exchange sessions with Pro Tools (no AAF/OMF, no `.ptx`) | File formats | [file-format-parity.md](file-format-parity.md) | 50–90 |
 | G-04 | Open correctness bugs in features counted as done (~25 issues) | Stability | this file | 25–40 |
 | G-05 | (Entitlement part: alpha blocker for the mix row) Third-party VST3s blocked in the signed macOS build; AU editors missing | Ecosystem | [plugin-parity.md](plugin-parity.md) | 15–25 |
@@ -60,13 +60,15 @@ When you close a gap, delete its entry (or shrink it) in the same PR, and bump t
 
 ### G-02. MIDI devices
 
-- **Missing:** all MIDI hardware I/O. No `midir`/CoreMIDI/WinMM/ALSA sequencer code exists;
-  `setup.midi_input_devices` and `setup.midi_studio` only store names. You cannot record from a
-  keyboard, play a hosted instrument live, drive external synths, or send MIDI clock/MTC.
-  `midi_editor.rs:288` notes audition "needs a live MIDI input path".
-- **Impact:** MIDI production is limited to drawing notes and importing SMF.
-- **Estimate:** ≈ 20–35 h (device layer, realtime input to armed tracks and instruments with
-  timestamps, MIDI record/merge/loop, thru, output tracks, clock out).
+- **Implemented:** native device listing, saved per-track input/output IDs and channel filters,
+  armed-track instrument monitoring and hardware thru, timestamped recording with controllers,
+  external clip playback, sustain fallback, panic and overflow/disconnect cleanup.
+  Setup › MIDI Hardware exposes configuration; commands are documented in [midi-hardware.md](midi-hardware.md).
+- **Remaining:** physical keyboard/synth round-trip validation on each OS, MIDI merge,
+  MIDI clock/MTC (G-11), browser Web MIDI and controller mapping. Refresh devices after reconnecting.
+- **Evidence:** simulated queues exercise armed-track filtering, instrument sound and stop-time
+  recording flush; command tests cover take conversion, controllers, undo and preservation of previous takes.
+  The alpha gate remains unverified until a physical-device run is recorded.
 
 ### G-03. Session interchange with Pro Tools
 
@@ -225,6 +227,7 @@ missing. Out of scope unless the owner decides otherwise.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-27 | minor | Native MIDI discovery, armed-track monitoring, timestamped takes, external output and note cleanup implemented; physical hardware validation pending; readiness unchanged |
 | 2026-10-27 | trivial | Product renamed WABTY Studio; readiness unchanged |
 | 2026-10-25 | trivial | G-04: Clip Looping (#1030) lacks the loop crossfade option, and Number of Loops stops at 512 while length and fill make up to 1000 loops |
 | 2026-10-24 | trivial | G-08: 27 processors + 3 instruments, as the plugin registry holds; G-20: the sampler shipped (#108), so it is no longer listed as missing |

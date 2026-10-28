@@ -1,10 +1,9 @@
 # Hardware parity
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-27 · **Change:** trivial (WABTY Studio rebrand; readiness unchanged) · **Target:** Avid Pro Tools Ultimate 2026.4.1
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-27 · **Change:** minor (native MIDI implementation; hardware validation pending) · **Target:** Avid Pro Tools Ultimate 2026.4.1
 
 A DAW is judged by how it drives audio interfaces, MIDI gear, control surfaces and sync. This is
-WABTY Studio's weakest dimension. Ours is measured from `crates/playback` (cpal) and the absence of
-any MIDI-device or control-surface code; Pro Tools' from its documentation and Setup menus.
+WABTY Studio's weakest dimension. Ours is measured from `crates/playback` (cpal) and the native MIDI layer in `crates/midi`; control-surface support remains absent; Pro Tools' from its documentation and Setup menus.
 
 **Hardware: ~12 % ready** (estimated). **Performance: ~35 %** (estimated; nothing benchmarked
 against Pro Tools). Remaining ≈ 110–180 h for hardware, 40–70 h for performance.
@@ -29,11 +28,13 @@ Legend: ✅ works · 🟡 partial · ❌ missing.
 
 ## MIDI
 
+See [MIDI hardware](midi-hardware.md) for setup, timing, tests and current limits. Native backends are supplied by midir; browser builds return an explicit unsupported error.
+
 | Feature | Pro Tools | WABTY Studio (all platforms) |
 |---|---|---|
-| MIDI input devices (keyboards, pads) | ✅ | ❌ no MIDI device layer at all (`setup.midi_input_devices` stores names) |
-| MIDI output to external gear | ✅ | ❌ |
-| MIDI Thru, input filter | ✅ | ❌ (stored flags only) |
+| MIDI input devices (keyboards, pads) | ✅ | 🟡 native midir input, device IDs, armed routing and timestamped takes; physical validation pending |
+| MIDI output to external gear | ✅ | 🟡 native thru and timeline output; physical validation pending |
+| MIDI Thru, input filter | ✅ | 🟡 armed-track thru and channel filter; broader stored input filters are not connected |
 | MIDI Beat Clock out, MTC generate/chase | ✅ | ❌ |
 | MIDI learn / controller mapping | ✅ (via surfaces and plug-in maps) | ❌ |
 | Virtual MIDI keyboard | ✅ (MIDI Keyboard window) | 🟡 window exists, no live audition path |
@@ -72,6 +73,7 @@ Legend: ✅ works · 🟡 partial · ❌ missing.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-27 | minor | Native MIDI discovery, armed-track monitoring, timestamped takes, external output and note cleanup implemented; physical hardware validation pending; readiness unchanged |
 | 2026-10-27 | trivial | Product renamed WABTY Studio; readiness unchanged |
 | 2026-10-13 | trivial | bounces of a bus fed by an aux compensate its latency (#246) |
 | 2026-10-12 | minor | Audio device settings: system, output, input, sample rate and buffer size; opt-in ASIO |

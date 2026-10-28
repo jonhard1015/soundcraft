@@ -9,6 +9,11 @@ rust-version.workspace = true
 [dependencies]
 serde.workspace = true
 thiserror.workspace = true
+crossbeam-queue = "0.3"
+web-time.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+midir = "0.11.1"
 
 [dev-dependencies]
 proptest.workspace = true

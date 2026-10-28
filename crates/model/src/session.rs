@@ -779,6 +779,12 @@ impl Session {
         truncate_chars(&mut self.comments, MAX_COMMENT_CHARS);
         for t in &mut self.tracks {
             t.mixer.sanitize();
+            t.midi_channel = t.midi_channel.filter(|c| *c < 16);
+            for id in [&mut t.midi_input, &mut t.midi_output] {
+                if id.as_ref().is_some_and(|s| s.is_empty() || s.len() > 1024 || s.chars().any(char::is_control)) {
+                    *id = None;
+                }
+            }
             truncate_chars(&mut t.name, MAX_NAME_CHARS);
             truncate_chars(&mut t.comments, MAX_COMMENT_CHARS);
             if t.playlists.is_empty() {

@@ -8,6 +8,8 @@ rust-version.workspace = true
 
 [dependencies]
 soundcraft-time.workspace = true
+soundcraft-midi.workspace = true
+crossbeam-queue = "0.3"
 soundcraft-audio-io.workspace = true
 soundcraft-model.workspace = true
 soundcraft-mix.workspace = true

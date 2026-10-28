@@ -1,11 +1,10 @@
 [package]
 name = "soundcraft-playback"
-description = "SoundCraft audio device I/O: realtime playback and recording through the mix engine"
+description = "WABTY Studio audio device I/O: realtime playback and recording through the mix engine"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-repository.workspace = true
 
 [dependencies]
 soundcraft-time.workspace = true

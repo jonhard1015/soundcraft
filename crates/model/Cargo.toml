@@ -1,11 +1,10 @@
 [package]
 name = "soundcraft-model"
-description = "SoundCraft session document: tracks, playlists, clips, mixer, routing, automation, markers"
+description = "WABTY Studio session document: tracks, playlists, clips, mixer, routing, automation, markers"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-repository.workspace = true
 
 [dependencies]
 soundcraft-time.workspace = true

@@ -1,6 +1,6 @@
 # Control protocol
 
-SoundCraft can be driven completely by other programs: scripts, test harnesses and AI agents.
+WABTY Studio can be driven completely by other programs: scripts, test harnesses and AI agents.
 Every menu item, button, mouse gesture and keystroke maps to a **command** (or to synthetic
 input), and every command is reachable from:
 
@@ -15,7 +15,7 @@ input), and every command is reachable from:
 ## Isolated automation profiles
 
 Set `SOUNDCRAFT_CONFIG_DIR` to a fresh directory to isolate UI preferences, `Autosave`, `Presets`, and `logs`.
-The nonempty value is used as the complete settings directory, even in portable mode (`portable.txt` beside the executable, which otherwise uses `SoundCraftData` next to it). Unset retains the normal platform paths;
+The nonempty value is used as the complete settings directory, even in portable mode (`portable.txt` beside the executable, which otherwise uses `WABTYStudioData` next to it). Unset retains the normal platform paths;
 an explicit empty value disables the settings directory instead of falling back to a personal profile. Save synthetic sessions to explicit scratch paths. Do not use `SOUNDCRAFT_NO_PREFS`
 when testing preference persistence across restarts.
 

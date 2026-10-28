@@ -1,27 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
-  <Package Name="SoundCraft" Manufacturer="Learning Machines LLC" Version="$(var.Version)" UpgradeCode="EE53D3E5-D0AE-40F9-808D-9417FDEBF61A" Scope="perUserOrMachine" Compressed="yes" Language="1033">
-    <SummaryInformation Description="SoundCraft digital audio workstation" Manufacturer="Learning Machines LLC" />
+  <Package Name="WABTY Studio" Manufacturer="WABTY" Version="$(var.Version)" UpgradeCode="45C9F967-D2E8-5814-922D-5AFD9DDACCCB" Scope="perUserOrMachine" Compressed="yes" Language="1033">
+    <SummaryInformation Description="WABTY Studio digital audio workstation" Manufacturer="WABTY" />
     <?include $(sys.SOURCEFILEDIR)install-policy.wxi?>
     <!-- Same-version upgrades let successive pre-releases of one X.Y.Z replace each other
          (MSI versions are numeric, so 1.2.3-rc.1 and 1.2.3-rc.2 are both 1.2.3). -->
-    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer version of SoundCraft is already installed." />
+    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer version of WABTY Studio is already installed." />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
     <Icon Id="SoundcraftIcon.ico" SourceFile="$(var.IconPath)" />
     <Property Id="ARPPRODUCTICON" Value="SoundcraftIcon.ico" />
-    <Property Id="ARPURLINFOABOUT" Value="https://getartcraft.com/apps/soundcraft" />
-    <Property Id="ARPURLUPDATEINFO" Value="https://getartcraft.com/apps/soundcraft" />
-    <Property Id="ARPHELPLINK" Value="https://discord.gg/artcraft" />
 
     <StandardDirectory Id="ProgramFiles6432Folder">
-      <Directory Id="CraftSuiteFolder" Name="ArtCraft">
-        <Directory Id="INSTALLFOLDER" Name="SoundCraft" />
+      <Directory Id="CraftSuiteFolder" Name="WABTY">
+        <Directory Id="INSTALLFOLDER" Name="WABTY Studio" />
       </Directory>
     </StandardDirectory>
     <StandardDirectory Id="ProgramMenuFolder" />
 
-    <Feature Id="Main" Title="SoundCraft" Level="1">
+    <Feature Id="Main" Title="WABTY Studio" Level="1">
       <ComponentGroupRef Id="SoundcraftFiles" />
     </Feature>
   <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
@@ -36,47 +33,47 @@
       <Component Id="SoundcraftNotice">
         <File Id="SoundcraftNoticeFile" Source="$(var.BinDir)\NOTICE" KeyPath="yes" />
       </Component>
-      <Component Id="SoundcraftApp" Guid="091136D7-205E-41A8-9D27-5E231F7CBBD4">
+      <Component Id="SoundcraftApp" Guid="0794950C-3CFA-51A3-AED4-9A83C6B546EF">
         <File Id="SoundcraftExe" Source="$(var.BinDir)\soundcraft.exe" KeyPath="yes">
-          <Shortcut Id="StartMenuShortcut" Directory="ProgramMenuFolder" Name="SoundCraft" Description="SoundCraft digital audio workstation" WorkingDirectory="INSTALLFOLDER" Advertise="yes" Icon="SoundcraftIcon.ico" IconIndex="0" />
+          <Shortcut Id="StartMenuShortcut" Directory="ProgramMenuFolder" Name="WABTY Studio" Description="WABTY Studio digital audio workstation" WorkingDirectory="INSTALLFOLDER" Advertise="yes" Icon="SoundcraftIcon.ico" IconIndex="0" />
         </File>
 
-        <!-- .scraft: SoundCraft's own session format; SoundCraft is its default app. -->
-        <ProgId Id="SoundCraft.Session" Description="SoundCraft Session" Icon="SoundcraftExe" IconIndex="0">
+        <!-- .scraft: WABTY Studio's own session format; WABTY Studio is its default app. -->
+        <ProgId Id="WABTYStudio.Session" Description="WABTY Studio Session" Icon="SoundcraftExe" IconIndex="0">
           <Extension Id="scraft" ContentType="application/x-soundcraft-session">
             <Verb Id="open" Command="Open" TargetFile="SoundcraftExe" Argument="&quot;%1&quot;" />
           </Extension>
         </ProgId>
         <!-- Audio and MIDI files: offered under "Open with" (imported into a session), never forced
              as the default. -->
-        <ProgId Id="SoundCraft.Audio" Description="Audio File" Icon="SoundcraftExe" IconIndex="0" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SoundCraft.Audio\shell\open\command" Value="&quot;[#SoundcraftExe]&quot; &quot;%1&quot;" Type="string" />
-        <ProgId Id="SoundCraft.Midi" Description="MIDI File" Icon="SoundcraftExe" IconIndex="0" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SoundCraft.Midi\shell\open\command" Value="&quot;[#SoundcraftExe]&quot; &quot;%1&quot;" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\.wav\OpenWithProgids" Name="SoundCraft.Audio" Value="" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\.aif\OpenWithProgids" Name="SoundCraft.Audio" Value="" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\.aiff\OpenWithProgids" Name="SoundCraft.Audio" Value="" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\.flac\OpenWithProgids" Name="SoundCraft.Audio" Value="" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\.mp3\OpenWithProgids" Name="SoundCraft.Audio" Value="" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\.mid\OpenWithProgids" Name="SoundCraft.Midi" Value="" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\.midi\OpenWithProgids" Name="SoundCraft.Midi" Value="" Type="string" />
+        <ProgId Id="WABTYStudio.Audio" Description="Audio File" Icon="SoundcraftExe" IconIndex="0" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\WABTYStudio.Audio\shell\open\command" Value="&quot;[#SoundcraftExe]&quot; &quot;%1&quot;" Type="string" />
+        <ProgId Id="WABTYStudio.Midi" Description="MIDI File" Icon="SoundcraftExe" IconIndex="0" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\WABTYStudio.Midi\shell\open\command" Value="&quot;[#SoundcraftExe]&quot; &quot;%1&quot;" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\.wav\OpenWithProgids" Name="WABTYStudio.Audio" Value="" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\.aif\OpenWithProgids" Name="WABTYStudio.Audio" Value="" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\.aiff\OpenWithProgids" Name="WABTYStudio.Audio" Value="" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\.flac\OpenWithProgids" Name="WABTYStudio.Audio" Value="" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\.mp3\OpenWithProgids" Name="WABTYStudio.Audio" Value="" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\.mid\OpenWithProgids" Name="WABTYStudio.Midi" Value="" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\.midi\OpenWithProgids" Name="WABTYStudio.Midi" Value="" Type="string" />
 
-        <!-- "Open with" app list and the Run dialog (Win+R "soundcraft"). -->
-        <RegistryValue Root="HKMU" Key="Software\Classes\Applications\soundcraft.exe" Name="FriendlyAppName" Value="SoundCraft" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\Applications\soundcraft.exe\shell\open\command" Value="&quot;[#SoundcraftExe]&quot; &quot;%1&quot;" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\Applications\soundcraft.exe\SupportedTypes" Name=".scraft" Value="" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\Applications\soundcraft.exe\SupportedTypes" Name=".wav" Value="" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\Applications\soundcraft.exe\SupportedTypes" Name=".aif" Value="" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\Applications\soundcraft.exe\SupportedTypes" Name=".aiff" Value="" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\Applications\soundcraft.exe\SupportedTypes" Name=".flac" Value="" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\Applications\soundcraft.exe\SupportedTypes" Name=".mp3" Value="" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\Applications\soundcraft.exe\SupportedTypes" Name=".mid" Value="" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\Applications\soundcraft.exe\SupportedTypes" Name=".midi" Value="" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Microsoft\Windows\CurrentVersion\App Paths\soundcraft.exe" Value="[#SoundcraftExe]" Type="string" />
-      <RegistryValue Root="HKMU" Key="Software\SoundCraft" Name="InstallDir" Value="[INSTALLFOLDER]" Type="string" />
+        <!-- "Open with" app list and the Run dialog (Win+R "wabty-studio"). -->
+        <RegistryValue Root="HKMU" Key="Software\Classes\Applications\wabty-studio.exe" Name="FriendlyAppName" Value="WABTY Studio" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\Applications\wabty-studio.exe\shell\open\command" Value="&quot;[#SoundcraftExe]&quot; &quot;%1&quot;" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\Applications\wabty-studio.exe\SupportedTypes" Name=".scraft" Value="" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\Applications\wabty-studio.exe\SupportedTypes" Name=".wav" Value="" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\Applications\wabty-studio.exe\SupportedTypes" Name=".aif" Value="" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\Applications\wabty-studio.exe\SupportedTypes" Name=".aiff" Value="" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\Applications\wabty-studio.exe\SupportedTypes" Name=".flac" Value="" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\Applications\wabty-studio.exe\SupportedTypes" Name=".mp3" Value="" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\Applications\wabty-studio.exe\SupportedTypes" Name=".mid" Value="" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\Applications\wabty-studio.exe\SupportedTypes" Name=".midi" Value="" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Microsoft\Windows\CurrentVersion\App Paths\wabty-studio.exe" Value="[#SoundcraftExe]" Type="string" />
+      <RegistryValue Root="HKMU" Key="Software\WABTY Studio" Name="InstallDir" Value="[INSTALLFOLDER]" Type="string" />
       </Component>
 
-      <Component Id="SoundcraftCli" Guid="4552049A-C2F0-4AB0-BAE6-A62C3348F4B4">
+      <Component Id="SoundcraftCli" Guid="EFC45DE9-5B61-5E30-8F62-EE016978AD5F">
         <File Id="SoundcraftCliExe" Source="$(var.BinDir)\soundcraft-cli.exe" KeyPath="yes" />
       </Component>
     </ComponentGroup>

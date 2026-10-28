@@ -1,6 +1,6 @@
 # Plugin parity: built-in processors and plugin hosting
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-25 · **Change:** trivial (Auto Pan stereo balance; previously minor: AudioSuite speed ramps (speed_ramp); Auto Pan; Subharmonic; previously minor: Ring Modulator; VST3 host messages: IMessage and IAttributeList; previously trivial: Sampler ping-pong loop phase (#463); previously trivial: mix.instrument sets built-in instrument parameters in params (#265); previously minor: plugin editors on Windows) · **Target:** Avid Pro Tools Ultimate 2026.4.1
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-27 · **Change:** trivial (WABTY Studio rebrand; readiness unchanged) · **Target:** Avid Pro Tools Ultimate 2026.4.1
 
 Pro Tools users live in plugins: the bundled set covers everyday mixing, and third-party plugins
 cover the rest. This doc tracks both. Our plugins have our own names and are written from
@@ -11,7 +11,7 @@ scratch (clean-room rule): Avid plugin names are not used here, only categories.
 
 ## Built-in processors (measured from `crates/dsp/src/plugins`)
 
-| Category | Pro Tools bundles (approx., by category) | SoundCraft (ids) | Gap |
+| Category | Pro Tools bundles (approx., by category) | WABTY Studio (ids) | Gap |
 |---|---|---|---|
 | EQ | 1-band and 7-band EQ, channel strip, vintage EQ models | `eq_1band`, `eq_7band`, `channel_strip` | Vintage models, linear phase, dynamic EQ; parametric UI (#139) |
 | Dynamics | compressor/limiter, expander/gate, de-esser, maximizer, vintage compressors, multiband | `compressor`, `expander_gate`, `de_esser`, `maximizer` | Vintage/opto models, multiband, sidechain input (no key input anywhere) |
@@ -29,13 +29,13 @@ AudioSuite: every catalog AudioSuite leaf maps to one of our processes (`AUDIOSU
 handles, "clip by clip / entire selection" and multi-input modes beyond the basics; hosted
 plugins can't be used offline as AudioSuite yet.
 
-Fidelity: **unmeasured.** Nothing compares a SoundCraft processor's frequency response, gain
+Fidelity: **unmeasured.** Nothing compares a WABTY Studio processor's frequency response, gain
 reduction curve or reverb tail with the Pro Tools equivalent (G-07 in [`gaps.md`](gaps.md)).
 User report #152: a saved instrument level does not reach the bounce.
 
 ## Third-party plugin hosting
 
-| Feature | Pro Tools | SoundCraft | Notes |
+| Feature | Pro Tools | WABTY Studio | Notes |
 |---|---|---|---|
 | Plugin format | AAX only (Native and DSP) | CLAP, VST3, Audio Units (macOS) | Users' libraries mostly ship VST3/AU too. AAX (#109) needs Avid's SDK licence and PACE signing: owner decision, likely never |
 | VST2, LV2, LADSPA | — | ❌ (#30) | Beyond Pro Tools; VST2 SDK is no longer licensable |
@@ -58,6 +58,7 @@ User report #152: a saved instrument level does not reach the bounce.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-27 | trivial | Product renamed WABTY Studio; readiness unchanged |
 | 2026-10-25 | trivial | Auto Pan: constant-power balance of the left and right channels; stereo passes unchanged at the center |
 | 2026-10-24 | minor | AudioSuite speed ramps (`speed_ramp`): down to a stop and up from one, Fit To or Extend, fades on or off |
 | 2026-10-24 | minor | Auto Pan: LFO and envelope panning of stereo tracks; built-in count 27 processors + 3 instruments |

@@ -16,7 +16,7 @@ pub fn configure(options: &mut NativeOptions, backend_override: Option<Backends>
         // out of the instance avoids it. This matches the verified WGPU_BACKEND=dx12
         // workaround without mutating process environment variables.
         create.instance_descriptor.backends = backend_override.unwrap_or(Backends::DX12);
-        // Auto loads whichever dxcompiler.dll the DLL search path finds; SoundCraft ships
+        // Auto loads whichever dxcompiler.dll the DLL search path finds; WABTY Studio ships
         // none, and without a matching dxil.dll the unsigned-DXIL warning fails wgpu's
         // indirect-validation pipeline and loses the device before the first frame
         // (issue #185). FXC uses the compiler that is part of Windows.

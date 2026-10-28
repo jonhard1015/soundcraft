@@ -31,20 +31,19 @@ impl NativeMenu {
         let menu = Menu::new();
         let (tx, events) = channel();
         let mut native = Self { menu, entries: Vec::new(), events, last_sync: None };
-        let app_menu = Submenu::new("SoundCraft", true);
-        native.add_item(app, &app_menu, "About SoundCraft", "", Some("window.about".into()))?;
-        native.add_item(app, &app_menu, "Preferences...", "", Some("setup.preferences".into()))?;
+        let app_menu = Submenu::new("WABTY Studio", true);
+        native.add_item(app, &app_menu, "About WABTY Studio", "", Some("window.about".into()))?;
         native.add_item(app, &app_menu, "Session Info", "", Some("window.session_info".into()))?;
         native.add_item(app, &app_menu, "Session Audio Health", "", Some("window.audio_health".into()))?;
         app_menu.append(&PredefinedMenuItem::separator())?;
         app_menu.append(&PredefinedMenuItem::services(None))?;
         app_menu.append(&PredefinedMenuItem::separator())?;
         // muda's own Hide items take ⌘H and ⌥⌘H, which are Heal Separation and Copy to Send.
-        app_menu.append(&MenuItem::with_id("hide", "Hide SoundCraft", true, None))?;
+        app_menu.append(&MenuItem::with_id("hide", "Hide WABTY Studio", true, None))?;
         app_menu.append(&MenuItem::with_id("hide_others", "Hide Others", true, None))?;
         app_menu.append(&PredefinedMenuItem::show_all(None))?;
         app_menu.append(&PredefinedMenuItem::separator())?;
-        native.add_item(app, &app_menu, "Quit SoundCraft", "", Some("app.quit".into()))?;
+        native.add_item(app, &app_menu, "Quit WABTY Studio", "", Some("app.quit".into()))?;
         native.menu.append(&app_menu)?;
         let aliases = menus::ui_aliases();
         for root in menus::tree() {
@@ -95,8 +94,8 @@ impl NativeMenu {
                 && let Some(command) = &entry.command
                 && menus::item_state(app, &entry.path, Some(command)).0
             {
-                if entry.path.is_empty() && (command.starts_with("window.") || command == "setup.preferences") {
-                    // Application-menu window entries open their window rather than toggling it.
+                if entry.path.is_empty() && command.starts_with("window.") {
+                    // The application menu's About / Session Info open their window (never close it).
                     let _ = app.run(command, serde_json::json!({"value": true}));
                 } else {
                     menus::invoke_menu(app, command, &entry.path);

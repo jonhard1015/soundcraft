@@ -78,7 +78,7 @@ impl SoundApp {
     }
 
     /// Done with the open session. Unsaved changes stay in its autosave folder for the next
-    /// launch, unless the user quit with SoundCraft's Quit; a take still recording is finished
+    /// launch, unless the user quit with WABTY Studio's Quit; a take still recording is finished
     /// and always stays.
     pub fn close_autosave(&mut self) {
         let recording = self.engine.transport.recording;
@@ -105,9 +105,9 @@ impl SoundApp {
         self.panic_rev = self.engine.revision;
         let saved = self.engine.is_dirty() && self.write_autosave();
         self.ui.status = if saved {
-            "SoundCraft hit an internal error (see the log). Your changes were autosaved: save them, then restart SoundCraft.".into()
+            "WABTY Studio hit an internal error (see the log). Your changes were autosaved: save them, then restart WABTY Studio.".into()
         } else {
-            "SoundCraft hit an internal error (see the log). Restart SoundCraft to be safe.".into()
+            "WABTY Studio hit an internal error (see the log). Restart WABTY Studio to be safe.".into()
         };
     }
 

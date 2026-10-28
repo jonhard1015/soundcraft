@@ -1,11 +1,10 @@
 [package]
 name = "soundcraft-engine"
-description = "SoundCraft command engine: commands, undo, editing operations, import/export, bounce, parity catalog"
+description = "WABTY Studio command engine: commands, undo, editing operations, import/export, bounce, parity catalog"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-repository.workspace = true
 
 [dependencies]
 soundcraft-time.workspace = true

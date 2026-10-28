@@ -1,4 +1,4 @@
-//! The FFI boundary: the only module in SoundCraft allowed to use `unsafe`.
+//! The FFI boundary: the only module in WABTY Studio allowed to use `unsafe`.
 //!
 //! It loads CLAP binaries (`libloading`), calls the plugin entry/factory/plugin vtables
 //! (`clap-sys` raw bindings) and implements the host callbacks. Everything it exposes to the rest
@@ -7,7 +7,7 @@
 //! Soundness rests on the CLAP contract (the plugin honours the vtable signatures and the
 //! documented pointer lifetimes). A plugin that violates it (e.g. dereferences garbage) can still
 //! crash the process: hosting in-process can't prevent that. What this module guarantees is that
-//! *SoundCraft* never hands the plugin dangling or mis-sized pointers, never calls a missing
+//! *WABTY Studio* never hands the plugin dangling or mis-sized pointers, never calls a missing
 //! (null) function pointer, and never reads plugin strings beyond their bounds.
 
 use crate::{ClapError, scan};

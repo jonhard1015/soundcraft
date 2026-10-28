@@ -1,4 +1,4 @@
-# SoundCraft — egui 0.37 migration plan
+# WABTY Studio — egui 0.37 migration plan
 
 ## Current qualification — 2026-10-25
 
@@ -18,7 +18,7 @@ Workspace/DockCommand APIs required by this app. Local validation used the
 retained task-scoped Git mirror. Remote CI must independently qualify fetching
 the dependency graph.
 
-The docking port preserves SoundCraft's default side beside the session canvas
+The docking port preserves WABTY Studio's default side beside the session canvas
 when a saved panel anchor has disappeared. It probes recorded locations and
 hidden-anchor chains before selecting that fallback. Regression coverage includes
 a deleted anchor and a hidden floating chain. Earlier drag/float/close/reopen/reload
@@ -50,7 +50,7 @@ clues, never as current acceptance.
 
 ## 1. Decision in one page
 
-SoundCraft is not starting from a 0.36 `update`-only application. It already uses the root-`Ui`
+WABTY Studio is not starting from a 0.36 `update`-only application. It already uses the root-`Ui`
 lifecycle: `apps/soundcraft/src/main.rs:37-94` implements `eframe::App::logic`/`App::ui`, and
 `crates/ui-egui/src/lib.rs:1136` / `:1232` already take `&egui::Context` for logic and
 `&mut egui::Ui` for layout. Upstream 0.36.2 has the same `App::logic`/`App::ui` shape, so this
@@ -97,7 +97,7 @@ Target release state:
 
 The largest behavioural risk is not the Cargo update. It is the interaction between egui 0.37's
 multi-pass `Context::run_ui`, logic-only ticks (`Context::run_logic` / `App::logic` while hidden),
-and SoundCraft's current per-frame side effects (control queue, autosave, transport, dropped files,
+and WABTY Studio's current per-frame side effects (control queue, autosave, transport, dropped files,
 screenshots). That work is specified in §6.
 
 ## 2. Baselines, exact revisions and evidence
@@ -106,8 +106,8 @@ screenshots). That work is specified in §6.
 
 | Role | Revision / value | Notes |
 | --- | --- | --- |
-| Assigned SoundCraft checkout (planning) | `52471b37e957feaea56dfd48932ef16d314cc74a` | Historical planning `HEAD`; superseded by the local implementation update below |
-| Historical coherent 0.36.2 SoundCraft baseline | `e85a4801e9029c9a1f5ce536b11be65aea832ed8` (`Release 0.12.1`) | Direct `egui = "0.36"`, `eframe = "0.36"`, `egui_kittest = "0.36"`, `craft-ui` 0.36; one coherent family; the required performance baseline |
+| Assigned WABTY Studio checkout (planning) | `52471b37e957feaea56dfd48932ef16d314cc74a` | Historical planning `HEAD`; superseded by the local implementation update below |
+| Historical coherent 0.36.2 WABTY Studio baseline | `e85a4801e9029c9a1f5ce536b11be65aea832ed8` (`Release 0.12.1`) | Direct `egui = "0.36"`, `eframe = "0.36"`, `egui_kittest = "0.36"`, `craft-ui` 0.36; one coherent family; the required performance baseline |
 | Upstream egui 0.37.0 | `841a328ba2dd8f6996beb7189ebb7fc00e668a2a` | Peeled release commit; annotated tag object differs |
 | Suite fork research input | `a4f9a17f64a6bae61350fb85804c9df0d9865916` | `aiongg/craft/0.37`, movable branch; E1–E21; not a production pin |
 | Suite winit research input | `8b35388bd719e8cc86a95971ba0bc026c9a8f058` | `aiongg/winit craft/0.30.13-lang`; W17–W27; movable branch; no W15P |
@@ -279,18 +279,18 @@ window evidence.
 These are released upstream changes, not fork features. The fork may contain more changes (E1–E21);
 those are handled in §5 and §12.
 
-| ID | Source anchor | Change | Required SoundCraft adaptation |
+| ID | Source anchor | Change | Required WABTY Studio adaptation |
 | --- | --- | --- | --- |
 | A1 | `crates/ui-egui/src/control.rs:192` | `Event::MouseWheel` now has `source: MouseWheelSource` (`egui/src/data/input/event.rs` 0.37.0) | Set `MouseWheelSource::Wheel` for `unit:"line"`, `Trackpad` for point/trackpad; assert source and phase in `trackpad.rs` |
 | A2 | `control.rs:253`, `:268`; `PendingShot` at `:32-39` | `Event::Screenshot` and `egui::UserData` removed; `ViewportCommand::Screenshot(ScreenshotCallback)` | Replace event polling with `ctx.request_screenshot`, a bounded weak completion slot per request, and callback correlation (§6.4) |
 | A3 | `panels.rs:69`, `:98`, `:110`; all `WidgetType::*` occurrences | `WidgetType` is a deprecated alias for `accesskit::Role`; `SelectableLabel`/`Checkbox` are not accesskit roles | `SelectableLabel`→`Role::Button`, `Checkbox`→`Role::CheckBox`, `ComboBox`→`Role::ComboBox`, `Slider`→`Role::Slider`, `RadioButton`→`Role::RadioButton`; use `egui::Role` or `egui::accesskit::Role` consistently |
 | A4 | `panels.rs:155-185` | `scroll_area::State.offset` is private; public reads are `clamped_offset()`/`unclamped_offset()` | Read `out.state.clamped_offset().y`; apply a pending target through `ScrollArea::vertical_scroll_offset` next frame (no private writes) |
 | A5 | `Cargo.toml:50-52`; all `Id::new`/`ui.id()` uses | `Id::new` deprecated for `Id::unique`; `Ui::id`/`UiBuilder::id` renamed to `scope_id`; `AsId` is deprecated (`egui/src/id.rs:8-12`) but still present | Mechanical `Id::new`→`Id::unique`, `ui.id()`→`ui.scope_id()`, `UiBuilder::id`→`scope_id`; same hash, no state change. `clippy -D warnings` makes this blocking |
-| A6 | `crates/ui-egui/Cargo.toml:24,31`; `apps/soundcraft/Cargo.toml:21`; `egui_kittest-0.37.0/Cargo.toml` (`[dependencies.egui]`, `[dev-dependencies.egui]`) | 0.37 `egui` declares `default = []`; `default_fonts`/`monochrome_emoji_fonts` are opt-in. eframe's selected `default_fonts` enables ordinary bundled faces for the binary; the new `egui/monochrome_emoji_fonts` must be selected explicitly. kittest's normal `egui` dependency is `default-features = false`; only kittest's OWN `[dev-dependencies]` enable the font features, and dev-dependencies do not propagate. An isolated `cargo test -p soundcraft-ui-egui` graph is therefore predicted to have no bundled fonts | Enable `default_fonts` and `monochrome_emoji_fonts` on SoundCraft's egui dependency for the UI/test root and prove unification with `cargo tree -e features`; treat the no-fonts prediction as a resolution claim until that command runs. See §9 |
+| A6 | `crates/ui-egui/Cargo.toml:24,31`; `apps/soundcraft/Cargo.toml:21`; `egui_kittest-0.37.0/Cargo.toml` (`[dependencies.egui]`, `[dev-dependencies.egui]`) | 0.37 `egui` declares `default = []`; `default_fonts`/`monochrome_emoji_fonts` are opt-in. eframe's selected `default_fonts` enables ordinary bundled faces for the binary; the new `egui/monochrome_emoji_fonts` must be selected explicitly. kittest's normal `egui` dependency is `default-features = false`; only kittest's OWN `[dev-dependencies]` enable the font features, and dev-dependencies do not propagate. An isolated `cargo test -p soundcraft-ui-egui` graph is therefore predicted to have no bundled fonts | Enable `default_fonts` and `monochrome_emoji_fonts` on WABTY Studio's egui dependency for the UI/test root and prove unification with `cargo tree -e features`; treat the no-fonts prediction as a resolution claim until that command runs. See §9 |
 | A7 | `control.rs` and `Cargo.toml:21` | 0.36 eframe forced `egui-winit/clipboard` in its native dependency; 0.37 gates it behind `eframe/clipboard` | Add `"clipboard"` to native `eframe` features. Without it, copy/paste silently uses egui's simulated clipboard instead of the OS clipboard |
 | A8 | `crates/ui-egui/src/lib.rs:1136-1139` | After a completed `run_ui`, `current_pass_index()` is zero (`end_pass` takes the output), so the `>0` guard does not by itself skip an ordinary hidden tick. The real hazards are stale input/time in `run_logic` and duplicated non-idempotent work | Keep public host ordering; separate fresh input from background queues and monotonic deadlines (§6.2); test hidden and repeated passes |
 | A9 | `main.rs:52-58`; `sampler_window.rs:88-100`; `lib.rs:1232-1239`; web `web.rs:136-160` | `ctx.input()` in `run_logic` is the last UI pass's input; native `dropped_files` is not consumed. Visibility does not identify a logic-only callback: `RequestPaintWhileHidden` can run `App::ui` while minimized/occluded. `ui` returns before layout while `!fonts_ready`, so a drop read only after layout is lost on the first frame | Capture and clear `raw.dropped_files` through `input_mut` at the top of `ui`, before the `!fonts_ready` return, into a one-shot queue; process it after layout for every UI pass including a forced hidden paint. Never gate on `visible()` |
-| A10 | `Cargo.toml:50-52`; `crates/ui-egui/src/theme.rs:431-475` | 0.37 style defaults are roomier/larger corner radius; panel/menu geometry can shift | Keep explicit SoundCraft spacing/font/size overrides; assert geometry and exact custom faces; do not refresh screenshots first |
+| A10 | `Cargo.toml:50-52`; `crates/ui-egui/src/theme.rs:431-475` | 0.37 style defaults are roomier/larger corner radius; panel/menu geometry can shift | Keep explicit WABTY Studio spacing/font/size overrides; assert geometry and exact custom faces; do not refresh screenshots first |
 | A11 | `bounce.rs:68`; `shortcuts.rs:64-101`; `edit_window.rs:341` | 0.37 adds `MouseWheelSource`, kinetic scrolling and rubber-banding; smooth scroll values can change | Test wheel vs trackpad source, phase and momentum; make deterministic test styles (disable kinetic/rubber-band where exact offsets are asserted) |
 | A12 | `egui_kittest` 0.37 `accessibility.rs` | Every visible input widget must have an accessible name; otherwise the harness panics after a settled step | Add names to all custom-painted controls and text fields; audit every window/dialog; do not disable the check globally |
 | A13 | `egui_kittest` 0.37 `builder.rs` | Missing glyphs panic by default | Enable bundled fonts/emoji and fix the app's uncovered glyphs (§9); use `allow_missing_glyphs` only in a deliberately labelled tofu test, never for the suite |
@@ -376,9 +376,9 @@ winit                = { git = "https://github.com/storytold/winit", rev = "<REV
 
 The table is illustrative, not an exhaustive resolved-family list. Include `egui_glow`,
 `egui_system_font_provider` and any other egui workspace crate selected by native/web/dev
-features after metadata inspection. `egui_extras` is not directly used by SoundCraft; inspect
+features after metadata inspection. `egui_extras` is not directly used by WABTY Studio; inspect
 transitive test/optional graphs before deciding whether its patch is needed. `egui_plot` is not part of
-the 0.37 workspace and is not a SoundCraft dependency. `wgpu` stays at 30.0.1 unless a separately
+the 0.37 workspace and is not a WABTY Studio dependency. `wgpu` stays at 30.0.1 unless a separately
 reviewed change is needed; winit stays 0.30.13-compatible.
 
 Workflow pins:
@@ -407,11 +407,11 @@ Before accepting P1, in a managed build job with a complete registry index:
 3. `cargo tree -e features -p soundcraft --locked` shows `eframe/clipboard`,
    `egui/default_fonts`, `egui/monochrome_emoji_fonts`, and the intended winit/accesskit features.
    Repeat for `-p soundcraft-web` under the wasm target and check `eframe` web clipboard/file
-   features. Also inspect the SoundCraft UI test graph with
+   features. Also inspect the WABTY Studio UI test graph with
    `cargo tree -e features -p soundcraft-ui-egui --locked` (dev-dependencies included) and the
    production-only graph with `cargo tree -e features,no-dev -p soundcraft-ui-egui --locked`:
    `egui/default_fonts`, `egui/monochrome_emoji_fonts` and `epaint_default_fonts` must appear in
-   the test graph. Keep the three roots distinct: the production binary, the SoundCraft UI test
+   the test graph. Keep the three roots distinct: the production binary, the WABTY Studio UI test
    target and kittest's own test root. kittest's normal `[dependencies] egui` is `default-features = false`; only its own
    `[dev-dependencies]` enable fonts, and a dependency's dev-dependencies do not propagate.
 4. `cargo check --locked --target wasm32-unknown-unknown -p soundcraft-ui-egui -p soundcraft-web`.
@@ -426,7 +426,7 @@ Before accepting P1, in a managed build job with a complete registry index:
 
 ### 5.4 Vendors and existing fixes
 
-SoundCraft has no `vendor/` directory and no `[patch]` section today. It must not add a vendored
+WABTY Studio has no `vendor/` directory and no `[patch]` section today. It must not add a vendored
 copy of egui to solve compile errors. The relevant external fixes are:
 
 - E2+E3 in the suite fork (`egui-wgpu` surface fit and error-scoped configure/renderer creation),
@@ -439,17 +439,17 @@ copy of egui to solve compile errors. The relevant external fixes are:
   supports none of the complete clipboard, PRIMARY, surrounding-text or
   selection/deferred-child acceptance rows.
 - The app-local Windows DX12/FXC choice in `apps/soundcraft/src/graphics.rs:11-30` is a
-  SoundCraft fix and must be preserved. Do not delete it because the dependency changed.
+  WABTY Studio fix and must be preserved. Do not delete it because the dependency changed.
 - `muda` 0.21.2, `rfd` 0.17.2 and `image` 0.25.10 are non-egui dependencies; keep them unless a
   separate, reviewed reason exists. `build.rs` Windows resources and `ATTRIBUTION.md` assets are
   unaffected.
 
-No blanket vendor deletion is authorized. If a future consumer of SoundCraft carries a vendor,
+No blanket vendor deletion is authorized. If a future consumer of WABTY Studio carries a vendor,
 its disposition is tracked in that consumer's plan, not here.
 
 ### 5.5 Language work (#198) integration decision
 
-SoundCraft has no `craft-i18n` dependency and its menus/messages are English literals. The
+WABTY Studio has no `craft-i18n` dependency and its menus/messages are English literals. The
 language work tracked by craft-libs issue #198 is not a merged UI-localization contract. This
 migration therefore consumes the fork's text/input mechanisms where they affect existing fields
 (E5/E12–E16 bidi shaping and grapheme editing, E19/W25 keyboard layouts, E21/W27 IME
@@ -566,12 +566,12 @@ DesignCraft/GridCraft pilot instead uses the provisional CL-2 API, and its adapt
 must precede CL-2F. DeckCraft, FigCraft and ArtCraft Native use small
 contract-compatible local adapters, and `craft-ai-integrations/ai-egui` has no
 capture path, so the earlier "thirteen craft-ui consumers" shorthand is
-superseded. SoundCraft is one of the eleven and keeps its own request IDs, paths,
+superseded. WABTY Studio is one of the eleven and keeps its own request IDs, paths,
 settle delays, deadlines and replies outside the helper.
 
 Admission is explicit and checked before a capture is issued. The shared helper's
 default is **four outstanding captures, 128 MiB per image and 256 MiB aggregate**;
-an application may choose stricter caps. SoundCraft keeps its own **8-request
+an application may choose stricter caps. WABTY Studio keeps its own **8-request
 pending queue**, **4 in-flight captures**, **64 MiB per captured image** and **192 MiB
 aggregate encoding peak** (the image plus the raw/PNG/base64 copies built while encoding);
 a further request is rejected with `"screenshot queue full"` and
@@ -718,7 +718,7 @@ an explicit failure.
   wlroots/Hyprland, KWin and Mutter plus X11, and covers **keyboard- and pointer-triggered**
   selection serials and freshness per seat, owner/source/seat changes, no arbitrary first-seat
   fallback, empty/absent offers, self-paste, and slow/canceled/trickling/oversize transfers.
-  SoundCraft has no password field today, so password exclusion is a fork-level requirement
+  WABTY Studio has no password field today, so password exclusion is a fork-level requirement
   rather than an app workflow; the unchanged-selection non-reclaim rule still applies to every
   app selection. Record each compositor's capability rather than assuming parity.
 - `ui.scroll` (`control.rs:187-197`) must set `source` (`Wheel` for line units, `Trackpad` for
@@ -729,7 +729,7 @@ an explicit failure.
 - TextEdit click-away: upstream #8763 reports that a click outside a focused field collapses its
   selection before the clicked button runs; proposed PR #8764 is **open/unmerged** (head
   `6eb460a2a6d537d312a80579cb801895509deaed`), not released behavior. The suite fork owns the
-  selected P7c fix with pointer and keyboard regressions. SoundCraft has inline rename fields
+  selected P7c fix with pointer and keyboard regressions. WABTY Studio has inline rename fields
   (`panels.rs:411`, `dialogs.rs` path/name fields, `spot.rs`) and buttons beside them. Require
   the fork fix; permit an app-local workaround only with preserved selected range and undo
   semantics plus an explicit removal condition. Test select-then-click on a neighboring button
@@ -748,7 +748,7 @@ an explicit failure.
   disable, reset and seat removal; the final completed pass's `PlatformOutput` as authoritative
   **including `None`**, not `ime.or(self.ime)` accumulation; and a current-epoch `Done` with a
   mismatched serial applying incoming edits **once** while deferring outgoing state until a
-  matching serial, with obsolete owner/epoch batches invalidated. SoundCraft's fields are
+  matching serial, with obsolete owner/epoch batches invalidated. WABTY Studio's fields are
   built-in `TextEdit`s and inherit the producer; it has no custom document editor to adapt.
   Test outgoing text immediately after delete+commit and deletion-only batches, preedit
   exclusion, supplementary/combining/RTL text, field and two-window switches, focus
@@ -757,9 +757,9 @@ an explicit failure.
   Without this complete contract the "updated surrounding text" row is an unresolved gate, not
   a pass. The locked fork references `unicode-bidi 0.3.18` (Unicode 16) and
   `unicode-segmentation 1.13.3` (Unicode 17); conformance vectors must be pinned to those data
-  versions. A similar Mozilla report (bug 2080478) is motivation, not proof of a SoundCraft
+  versions. A similar Mozilla report (bug 2080478) is motivation, not proof of a WABTY Studio
   defect.
-- RTL/CJK names: the fork's E5/E12–E16 shape and reorder RTL text; SoundCraft's own layout remains
+- RTL/CJK names: the fork's E5/E12–E16 shape and reorder RTL text; WABTY Studio's own layout remains
   LTR. Test Arabic/Hebrew session names and Korean/Japanese names using the pinned fixtures from
   §9.2 (Noto Sans CJK SC covers Hangul; BIZ UDPGothic covers Japanese), not a nondeterministic
   system fallback. Include combining marks and emoji clusters. Do not add an app-wide
@@ -774,7 +774,7 @@ an explicit failure.
 ### 9.1 Font feature decision
 
 0.36's default fonts included emoji faces; 0.37 makes `default_fonts` opt-in and moves emoji
-fonts behind `monochrome_emoji_fonts` (while eframe can add a system color provider). SoundCraft's
+fonts behind `monochrome_emoji_fonts` (while eframe can add a system color provider). WABTY Studio's
 loader at `fonts.rs:109-139` starts from `FontDefinitions::default()`, prepends a system regular/
 bold and Hangul fallback, and assumes bundled defaults exist. Therefore:
 
@@ -783,12 +783,12 @@ bold and Hangul fallback, and assumes bundled defaults exist. Therefore:
   `cargo test -p soundcraft-ui-egui` graph. `egui` 0.37 declares `default = []`;
   `egui_kittest`'s normal `[dependencies] egui` is `default-features = false`, and only
   kittest's OWN `[dev-dependencies]` enable `default_fonts`/`monochrome_emoji_fonts`. A
-  dependency's dev-dependencies do not propagate, so kittest supplies no fonts to SoundCraft's
+  dependency's dev-dependencies do not propagate, so kittest supplies no fonts to WABTY Studio's
   tests. Prove this per root with `cargo tree -e features` for the production binary, the
-  SoundCraft UI test target and (separately, out of scope) kittest's own test root; treat the
+  WABTY Studio UI test target and (separately, out of scope) kittest's own test root; treat the
   no-bundled-fonts prediction as a resolution claim until the command runs.
 - Keep `eframe/system_fonts` **off** for this migration. That avoids eframe's new provider, not
-  all font-discovery cost: SoundCraft's own loader still runs up to three `fc-match` calls
+  all font-discovery cost: WABTY Studio's own loader still runs up to three `fc-match` calls
   (regular, bold, Hangul) and reads the returned files on Linux/FreeBSD (`fonts.rs:53-79`,
   `:109-139`). Measure `fc-match`, file reads and font install separately from egui work, cold
   and warm cache, and do not attribute the retained cost to egui. Re-evaluate a system provider
@@ -940,7 +940,7 @@ Regression assertions:
   FXC because GL initialization and missing DXC/DXIL break real machines. The 0.37 family keeps
   wgpu 30.0.1 and winit 0.30.13; do not change these defaults as part of the egui bump.
 - E2+E3 (surface fit and error-scoped configure/renderer creation) should be required in the
-  fork/release pin if SoundCraft keeps wgpu; verify resize, maximize, DPI changes, and device/
+  fork/release pin if WABTY Studio keeps wgpu; verify resize, maximize, DPI changes, and device/
   surface failure paths return errors instead of panicking.
 - `VideoPool` (`video_track.rs:281-430`) uses `load_texture("video-frame", ...)`,
   per-thumbnail names, and `TextureHandle::set` for the current frame. Tests set
@@ -952,20 +952,20 @@ Regression assertions:
   eframe uses its own defaults. Record the renderer/backend/options for every screenshot and
   performance run. Software-rendered Windows and a real GPU are separate evidence rows.
 - 0.37 upstream reports that need reproduction, not automatic acceptance:
-  - #8731: plain-text tessellation regression from the color-glyph check. SoundCraft is text-heavy
+  - #8731: plain-text tessellation regression from the color-glyph check. WABTY Studio is text-heavy
     (menus, track headers, mixer labels). Measure text tessellation in the frame benchmark; if
     confirmed, adopt a row-level fast path in the fork with mixed/color-row tests. Do not use a
     clamp-only or output-changing shortcut.
-  - #8736: DX12/FXC shader compile cost in `egui-wgpu` 0.37. SoundCraft explicitly selects FXC.
+  - #8736: DX12/FXC shader compile cost in `egui-wgpu` 0.37. WABTY Studio explicitly selects FXC.
     Measure renderer construction and first frame separately from the rest of startup. A
     float/`select` wrap implementation or a pipeline-overridable constant is acceptable only with
     Repeat/MirroredRepeat/clamp pixel tests; a clamp-only change is not equivalent.
   - #8512: system-font discovery/startup cost. Keeping `system_fonts` off avoids eframe's provider
-    only; SoundCraft's own loader still performs up to three `fc-match` calls and file reads.
+    only; WABTY Studio's own loader still performs up to three `fc-match` calls and file reads.
     Measure those, and font install, separately from egui startup, cold and warm cache.
   - #8763/#8764: TextEdit click-away selection. #8764 is open/unmerged; the fork owns the fix.
     Test the inline rename and Spot paths through pointer and keyboard (§8).
-  - #8748: closed and unmerged, not 0.37 behavior. Current SoundCraft uses immediate viewports;
+  - #8748: closed and unmerged, not 0.37 behavior. Current WABTY Studio uses immediate viewports;
     keep the limitation explicit and revisit only if the Mix window moves to deferred viewports.
   - #8657 and #8577: Wayland clipboard/PRIMARY and bidi. PRIMARY means W15P + E4/P2b, not W15
     alone; test native compositor workflows, not just compilation.
@@ -991,7 +991,7 @@ Regression assertions:
   renderer. kittest renders one image for all callbacks and cannot prove this.
 - Windows: use a uniquely owned clone from `/home/codex/work/VMs/craft-windows` and its
   `ACCESS.txt`/`READY.json`; build with the reviewed `Build-DesignCraft`-style equivalent for
-  SoundCraft or `cargo build --release --locked -p soundcraft`; verify FXC/DX12, mixed DPI,
+  WABTY Studio or `cargo build --release --locked -p soundcraft`; verify FXC/DX12, mixed DPI,
   native file picker, save/reopen and screenshots. The baseline uses the software renderer, so
   physical-GPU/audio claims are separate and unresolved.
   Capacity gate before allocation: the default 128 GiB full clone does not fit the recorded
@@ -1071,7 +1071,7 @@ not just exit codes.
 | Text/IME | Preedit/commit/cancel/replacement, click-away selection, grapheme/UTF-8 boundaries, outgoing surrounding text after delete+commit via E21b/P7b with owner present when unavailable, available-empty versus unavailable, transition clear/disable-enable, final-pass `None`, serial-mismatch apply-once/defer, stale-epoch invalidation; focus/password/reset clearing |
 | Scroll/input | Wheel vs trackpad source/phase, momentum/rubber-band policy, zoom anchor, shift-pan, gutter page |
 | Clipboard/PRIMARY | Bounded regular clipboard transfer (deadline/byte cap/workers/cancel/stale discard), keyboard- and pointer-triggered PRIMARY serials, owner/seat changes, no first-seat fallback, self-paste |
-| Screenshot | Two-viewport/request correlation in native/custom per-viewport evidence, exactly one reply/file, timeout/late callback inert, checked pre-issue reservation, geometry/epoch binding with cancel-on-any-change, surface-fit scale derivation, shared 4/128 MiB/256 MiB defaults with SoundCraft's stricter 4/64 MiB per image and 192 MiB encoding-peak caps, drain-to-zero |
+| Screenshot | Two-viewport/request correlation in native/custom per-viewport evidence, exactly one reply/file, timeout/late callback inert, checked pre-issue reservation, geometry/epoch binding with cancel-on-any-change, surface-fit scale derivation, shared 4/128 MiB/256 MiB defaults with WABTY Studio's stricter 4/64 MiB per image and 192 MiB encoding-peak caps, drain-to-zero |
 | Commands/undo | Fader/send drag one merged step; command via menu/control/CLI same id and one mutation |
 | Save/reopen | Round-trip document meaning, selection/workspace and autosave recovery; no dirty flag loss |
 | GPU/video | Video texture update/resize, oversize rejection, surface errors return errors, no panic |
@@ -1090,7 +1090,7 @@ not just exit codes.
   most 0.5% of pixels, no delta >32 outside reviewed regions, and zero missing-glyph/tofu pixels.
   Any difference in panel/window geometry, focus ring, scroll thumb, or text position is a
   failure until reviewed. The only expected style changes are the reviewed 0.37 default
-  button/corner differences; restore SoundCraft's explicit values where the product should not
+  button/corner differences; restore WABTY Studio's explicit values where the product should not
   change.
 - Never bulk-refresh a golden after seeing a failure. A changed image is accepted only with a
   written reason and a corresponding geometry/semantic assertion.
@@ -1179,7 +1179,7 @@ documented exception, not a changed golden.
 Dependency DAG:
 
 ```text
-P0 reviewed plans + SoundCraft baselines (e85a480..., current-engine/0.36-UI if it builds,
+P0 reviewed plans + WABTY Studio baselines (e85a480..., current-engine/0.36-UI if it builds,
    stock-0.37 control, fork) and preserved baseline executable/fixture
    |
    +-- approved published storytold egui P8 (E1-E21 + P2b + P7 + P7b/E21b + P7c)
@@ -1188,7 +1188,7 @@ P0 reviewed plans + SoundCraft baselines (e85a480..., current-engine/0.36-UI if 
    +-- reviewed craft-libs CL-1 (reconciled 3832c47 base)
    |        -> CL-2 capture prototype -> Design/Grid pilot adapters -> CL-2F API freeze
    |
-   -> P1 atomic SoundCraft compatibility (root pins, lock, API/clipboard/fonts,
+   -> P1 atomic WABTY Studio compatibility (root pins, lock, API/clipboard/fonts,
       lifecycle, capture adapter against the frozen CL-2F API)
         -> P1 rollback rehearsal
         -> P2 deeper UI assurance (accessibility inventory, scroll, glyphs, IME)
@@ -1243,7 +1243,7 @@ evidence and source work. No stage authorizes publication without fresh approval
 - `Cargo.lock.version = 4` may remain; regenerate it through Cargo, do not hand-edit package
   identities. Record old and new lockfile hashes.
 - The shared libraries are consumed by reviewed git revision for this migration. A separate
-  crates.io publication or stock compatibility promise is not implied. SoundCraft must repeat
+  crates.io publication or stock compatibility promise is not implied. WABTY Studio must repeat
   required root patches and never depend on machine-local path overrides.
 - `cargo package`/`cargo publish` is not applicable to `soundcraft` (`publish = false`); still
   inspect the generated `Cargo.lock` and metadata for accidental local paths.
@@ -1271,7 +1271,7 @@ Blocking unknowns:
    `craft_ui::capture::CaptureSlot` from the local craft-libs worktree. The reconciled `3832c47`
    base must be confirmed to carry the agreed CL-2F API when the final pin is chosen; a
    provisional API must not be pinned.
-4. **Upstream #8731/#8736 disposition.** The fork does not yet contain either fix. SoundCraft's
+4. **Upstream #8731/#8736 disposition.** The fork does not yet contain either fix. WABTY Studio's
    text-heavy UI and explicit FXC choice make both likely relevant; a measured result and a
    reviewed fork patch (or documented exception) are required before final performance acceptance.
 5. **Native evidence environments.** No `DISPLAY`/Wayland session, no Windows clone allocated, no

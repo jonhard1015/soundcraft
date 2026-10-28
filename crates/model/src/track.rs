@@ -217,7 +217,7 @@ impl TrackHeight {
     }
 }
 
-/// The default track colour palette (original, chosen for SoundCraft).
+/// The default track colour palette (original, chosen for WABTY Studio).
 pub const TRACK_COLORS: [[u8; 3]; 16] = [
     [86, 132, 214],
     [94, 170, 214],

@@ -7,7 +7,7 @@
 //!
 //! Soundness rests on the VST3 contract (the plugin honours the COM vtable signatures and the
 //! documented pointer lifetimes). A plugin that violates it can still crash the process: hosting
-//! in-process can't prevent that. What this module guarantees is that *SoundCraft* never hands
+//! in-process can't prevent that. What this module guarantees is that *WABTY Studio* never hands
 //! the plugin dangling or mis-sized pointers and never reads plugin strings beyond their bounds.
 
 // VST3 enum constants are `c_int` on Windows and `c_uint` elsewhere, so casts that are no-ops on
@@ -64,7 +64,7 @@ pub(crate) const PARAM_QUEUE_CAP: usize = 1024;
 const MAX_STATE_BYTES: usize = 64 << 20;
 /// Most editor parameter edits buffered between two UI frames.
 const EDIT_CAP: usize = 256;
-/// Magic of SoundCraft's state container: `SCV3` + u32 LE component length + component state +
+/// Magic of WABTY Studio's state container: `SCV3` + u32 LE component length + component state +
 /// u32 LE controller length + controller state.
 const STATE_MAGIC: &[u8; 4] = b"SCV3";
 
@@ -224,8 +224,8 @@ mod tests {
     #[test]
     fn strings_are_bounded() {
         let mut b = [0u16; 4];
-        write_c16("SoundCraft", &mut b);
-        assert_eq!(read_c16(&b), "Sou");
+        write_c16("WABTY Studio", &mut b);
+        assert_eq!(read_c16(&b), "WAB");
         let full: Vec<u16> = "abcd".encode_utf16().collect();
         assert_eq!(read_c16(&full), "abcd");
         let c: Vec<c_char> = b"Fx|EQ\0junk".iter().map(|&x| x as c_char).collect();
@@ -288,7 +288,7 @@ mod tests {
             assert_eq!(h.getName(&mut name), sb::kResultOk);
             assert_eq!(h.restartComponent(sv::RestartFlags_::kLatencyChanged as i32), sb::kResultOk);
         }
-        assert_eq!(read_c16(&name), "SoundCraft");
+        assert_eq!(read_c16(&name), "WABTY Studio");
         assert!(h.latency_changed.load(Ordering::Relaxed));
         assert_eq!(hex(&[0xAB; 16]), "AB".repeat(16));
     }

@@ -31,7 +31,7 @@ jobs:
     uses: storytold/craft-common-actions/.github/workflows/release.yml@main
     with:
       app-name: soundcraft
-      app-title: SoundCraft
+      app-title: WABTY Studio
       version: ${{ inputs.version }}
       contributors-artifact: ${{ needs.credits.outputs.artifact-name }}
     secrets:

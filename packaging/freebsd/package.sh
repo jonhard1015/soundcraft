@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build and package SoundCraft for FreeBSD:
+# Build and package WABTY Studio for FreeBSD:
 #
 #   $DIST/soundcraft-<version>-freebsd-<arch>.tar.gz   a /usr/local-style tree (<arch> is x86_64, or
 #       aarch64 when CARGO_BUILD_TARGET=aarch64-unknown-freebsd):
@@ -18,7 +18,7 @@ set -euo pipefail
 # shellcheck source=../env.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../env.sh"
 LINUX="$ROOT/packaging/linux"
-APP_ID=ai.storyteller.soundcraft
+APP_ID=com.wabty.studio
 
 SKIP_BUILD=0
 while [[ $# -gt 0 ]]; do
@@ -54,7 +54,7 @@ if [[ -n "${CARGO_BUILD_TARGET:-}" ]] && [[ "$(uname -s)" != FreeBSD ]]; then
 fi
 BASENAME="soundcraft-$VERSION-freebsd-$ARCH"
 
-echo "==> SoundCraft $VERSION for FreeBSD $ARCH"
+echo "==> WABTY Studio $VERSION for FreeBSD $ARCH"
 
 # The man-and-completions example is built with the binaries: it writes soundcraft-cli's man pages
 # and shell completions below. A cross build's example cannot run here, so it is built again for

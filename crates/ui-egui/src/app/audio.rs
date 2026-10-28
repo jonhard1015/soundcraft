@@ -59,7 +59,7 @@ impl SoundApp {
         let (cause, then) = match trouble {
             OutputTrouble::Bug => (
                 "the audio engine hit an internal error (see the log)".to_string(),
-                "Use Reconnect audio device in Setup › Playback Engine, or restart SoundCraft.",
+                "Use Reconnect audio device in Setup › Playback Engine, or restart WABTY Studio.",
             ),
             OutputTrouble::Gone => {
                 (format!("“{name}” is unavailable"), "Check the audio device, then use Reconnect audio device in Setup › Playback Engine.")

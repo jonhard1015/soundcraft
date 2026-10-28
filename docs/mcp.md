@@ -1,8 +1,7 @@
 # MCP server
 
-SoundCraft speaks the [Model Context Protocol](https://modelcontextprotocol.io) over stdio, so
-Claude and other agents can make music with it. The server is the `mcp` subcommand of
-`soundcraft-cli`, which [docs/cli.md](cli.md) describes.
+WABTY Studio speaks the [Model Context Protocol](https://modelcontextprotocol.io) over stdio, so
+Claude and other agents can make music with it.
 
 ```sh
 soundcraft-cli mcp                    # headless engine (no window, no audio device)
@@ -71,11 +70,11 @@ works across the suite) keep the agent to the folders you give it:
   misspelled `--automation-...` flag is an error rather than an unconfined server.
 
 The flags confine the in-process server, so `--connect` together with them is an error: the server
-would otherwise talk to an app that isn't confined. SoundCraft's desktop app has no equivalent flags
+would otherwise talk to an app that isn't confined. WABTY Studio's desktop app has no equivalent flags
 yet, so a running app (`soundcraft --control`) is not confined. `--demo` is the operator's own
 choice and is built before the roots apply.
 
-Playback and bounce need no check of their own. SoundCraft decodes audio into the session when it
+Playback and bounce need no check of their own. WABTY Studio decodes audio into the session when it
 enters it (import, open, sampler load), so rendering reads nothing from disk afterwards. Movies are
 the exception: a session only references them by path and the desktop app decodes pictures from
 that file, but the headless server never does, and the movie's path is checked when it is imported

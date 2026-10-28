@@ -169,7 +169,7 @@ impl EditorLink {
         }
     }
 
-    /// The component state plus the controller state, in SoundCraft's container (see
+    /// The component state plus the controller state, in WABTY Studio's container (see
     /// `STATE_MAGIC`). `None` when the component refuses `getState` or the instance is gone.
     pub fn save_state(&self) -> Option<Vec<u8>> {
         let g = self.lock();

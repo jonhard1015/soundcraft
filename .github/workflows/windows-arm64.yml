@@ -30,6 +30,6 @@ jobs:
     uses: storytold/craft-common-actions/.github/workflows/windows-arm64.yml@main
     with:
       app-name: soundcraft
-      app-dir: SoundCraft
-      install-relative-path: Programs/ArtCraft/SoundCraft
+      app-dir: WABTY Studio
+      install-relative-path: Programs/WABTY/WABTY Studio
       install-scope: perUser

@@ -1,8 +1,8 @@
 # Localization parity
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-10 · **Change:** major (first per-language status) · **Target:** Avid Pro Tools Ultimate 2026.4.1
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-27 · **Change:** trivial (WABTY Studio rebrand; readiness unchanged) · **Target:** Avid Pro Tools Ultimate 2026.4.1
 
-SoundCraft is English only. There is no string catalog: every menu label, dialog and tooltip is a
+WABTY Studio is English only. There is no string catalog: every menu label, dialog and tooltip is a
 literal in Rust (`crates/engine/src/cmd/*`, `crates/ui-egui/src/*`). Pro Tools ships its UI in
 **8 languages** (bundle `.lproj` folders: English, German, Spanish, French, Japanese, Korean,
 Simplified Chinese, Traditional Chinese).
@@ -39,4 +39,5 @@ Per-language hours exclude the shared catalog and script work above.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-27 | trivial | Product renamed WABTY Studio; readiness unchanged |
 | 2026-10-10 | major | Created: English only, no catalog; the twelve key languages at 0 %; Pro Tools' 8 languages listed from its bundle |

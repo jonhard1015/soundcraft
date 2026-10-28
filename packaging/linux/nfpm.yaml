@@ -13,8 +13,7 @@ release: 1
 section: sound
 priority: optional
 maintainer: ${SOUNDCRAFT_MAINTAINER}
-vendor: Learning Machines LLC
-homepage: https://getartcraft.com/apps/soundcraft
+vendor: WABTY
 license: MIT OR Apache-2.0
 description: |-
   Open-source, native digital audio workstation. Record, edit and mix

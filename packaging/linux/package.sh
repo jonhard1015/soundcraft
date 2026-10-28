@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build and package SoundCraft for Linux (<arch> is x86_64 or aarch64, or riscv64 when cross-compiling):
+# Build and package WABTY Studio for Linux (<arch> is x86_64 or aarch64, or riscv64 when cross-compiling):
 #
 #   $DIST/soundcraft-<version>-linux-<arch>.AppImage  any distro with glibc >= the build host's
 #   $DIST/soundcraft-<version>-linux-<arch>.AppImage.zsync  delta updates (needs zsyncmake)
@@ -22,7 +22,7 @@ set -euo pipefail
 # shellcheck source=../env.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../env.sh"
 HERE="$ROOT/packaging/linux"
-APP_ID=ai.storyteller.soundcraft
+APP_ID=com.wabty.studio
 
 SKIP_BUILD=0
 FORMATS="appimage deb rpm tar"
@@ -42,10 +42,10 @@ case "$ARCH" in
   riscv64) DEB_ARCH=riscv64 ;;
   *) echo "unsupported architecture $ARCH" >&2; exit 2 ;;
 esac
-export SOUNDCRAFT_MAINTAINER="${SOUNDCRAFT_MAINTAINER:-SoundCraft maintainers <soundcraft@storyteller.ai>}"
+export SOUNDCRAFT_MAINTAINER="${SOUNDCRAFT_MAINTAINER:-WABTY Studio maintainers}"
 BASENAME="soundcraft-$VERSION-linux-$ARCH"
 
-echo "==> SoundCraft $VERSION for Linux $ARCH ($FORMATS)"
+echo "==> WABTY Studio $VERSION for Linux $ARCH ($FORMATS)"
 
 # The man-and-completions example is built with the binaries: it writes soundcraft-cli's man pages
 # and shell completions below.
@@ -154,7 +154,7 @@ if has appimage; then
     echo "no pinned AppImage runtime for $ARCH; build the AppImage on x86_64 or aarch64" >&2
     exit 2
   fi
-  APPDIR="$WORK/SoundCraft.AppDir"
+  APPDIR="$WORK/WABTY Studio.AppDir"
   cp -R "$STAGE" "$APPDIR"
   ln -s usr/bin/soundcraft "$APPDIR/AppRun"
   cp "$HERE/$APP_ID.desktop" "$APPDIR/$APP_ID.desktop"
@@ -202,13 +202,17 @@ if has appimage; then
   # Update information: AppImageUpdate, AppImageLauncher and the like read it from the file and
   # fetch only the blocks that changed in a newer release, through the .zsync published next to
   # each AppImage on GitHub Releases. `latest` is the newest published release that is not a
-  # pre-release. A fork's builds point at its own releases through GITHUB_REPOSITORY.
-  REPO="${GITHUB_REPOSITORY:-storytold/soundcraft}"
-  UPDATE_INFO="gh-releases-zsync|${REPO%%/*}|${REPO#*/}|latest|soundcraft-*-linux-$ARCH.AppImage.zsync"
+  # pre-release. Set WABTY_RELEASE_REPOSITORY explicitly to enable delta updates.
+  REPO="${WABTY_RELEASE_REPOSITORY:-}"
+  update_args=()
+  if [[ -n "$REPO" ]]; then
+    UPDATE_INFO="gh-releases-zsync|${REPO%%/*}|${REPO#*/}|latest|soundcraft-*-linux-$ARCH.AppImage.zsync"
+    update_args=(-u "$UPDATE_INFO")
+  fi
   # Extract-and-run: works without FUSE (containers, CI). The output embeds the static runtime,
   # so users don't need libfuse2 either. With zsyncmake on the host (CI installs the zsync
   # package) appimagetool also writes the .zsync, into its working directory, hence the cd.
-  (cd "$DIST" && ARCH="$ARCH" APPIMAGE_EXTRACT_AND_RUN=1 "$TOOL" --no-appstream --runtime-file "$RUNTIME" -u "$UPDATE_INFO" "$APPDIR" "$OUT")
+  (cd "$DIST" && ARCH="$ARCH" APPIMAGE_EXTRACT_AND_RUN=1 "$TOOL" --no-appstream --runtime-file "$RUNTIME" ${update_args[@]+"${update_args[@]}"} "$APPDIR" "$OUT")
   echo "wrote $OUT"
   if [[ -s "$OUT.zsync" ]]; then
     echo "wrote $OUT.zsync"

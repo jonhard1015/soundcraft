@@ -1,11 +1,10 @@
 [package]
 name = "soundcraft-midi"
-description = "SoundCraft MIDI: note/controller sequences, Standard MIDI File import/export, MIDI editing operations, GM names"
+description = "WABTY Studio MIDI: note/controller sequences, Standard MIDI File import/export, MIDI editing operations, GM names"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-repository.workspace = true
 
 [dependencies]
 serde.workspace = true

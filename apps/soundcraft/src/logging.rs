@@ -9,7 +9,7 @@
 //! crashed survives the next launch. Runs without preferences (`SOUNDCRAFT_NO_PREFS`, agents' test
 //! runs) log to standard error only, so they don't rotate away the user's own logs.
 //!
-//! Levels: `info` for SoundCraft's own crates, `warn` for everything else (wgpu and naga are
+//! Levels: `info` for WABTY Studio's own crates, `warn` for everything else (wgpu and naga are
 //! chatty). `RUST_LOG` replaces that with env_logger-style directives: `debug`,
 //! `warn,soundcraft_mix=trace`, `wgpu_core=info`. A directive ending in `*` matches every target
 //! that starts with it (`soundcraft*=debug`).

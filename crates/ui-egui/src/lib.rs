@@ -1,4 +1,4 @@
-//! SoundCraft's egui user interface.
+//! WABTY Studio's egui user interface.
 //!
 //! The UI is a thin shell over [`soundcraft_engine::Engine`]: it draws engine state and acts by
 //! executing commands. It can be replaced without touching anything below it.

@@ -3,6 +3,7 @@
 
 use crate::SourceId;
 use soundcraft_audio_io::{AudioBuffer, FileFormat, peaks::Peaks};
+use std::path::PathBuf;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -58,23 +59,67 @@ impl VideoSource {
     }
 }
 
-/// Decoded audio plus waveform overviews (not serialised).
+/// How a source's audio is held in memory.
+#[derive(Debug)]
+pub enum AudioData {
+    /// Full file decoded into RAM (short clips, samples).
+    Ram(AudioBuffer),
+    /// Long file kept on disk; frames are read on demand.
+    Stream {
+        path: PathBuf,
+        channels: u16,
+        sample_rate: u32,
+        frames: u64,
+    },
+}
+
+impl AudioData {
+    pub fn num_channels(&self) -> usize {
+        match self {
+            AudioData::Ram(b) => b.channels.len(),
+            AudioData::Stream { channels, .. } => *channels as usize,
+        }
+    }
+    pub fn sample_rate(&self) -> u32 {
+        match self {
+            AudioData::Ram(b) => b.sample_rate,
+            AudioData::Stream { sample_rate, .. } => *sample_rate,
+        }
+    }
+    pub fn frame_count(&self) -> u64 {
+        match self {
+            AudioData::Ram(b) => b.frames() as u64,
+            AudioData::Stream { frames, .. } => *frames,
+        }
+    }
+}
+
+/// Decoded audio plus waveform overviews, or a reference to a file for disk streaming.
 #[derive(Debug)]
 pub struct SourceAudio {
-    pub buffer: AudioBuffer,
+    pub data: AudioData,
     pub peaks: Vec<Peaks>,
 }
 
 impl SourceAudio {
     pub fn new(buffer: AudioBuffer) -> Self {
         let peaks = buffer.channels.iter().map(|c| Peaks::build(c)).collect();
-        SourceAudio { buffer, peaks }
+        SourceAudio { data: AudioData::Ram(buffer), peaks }
+    }
+    pub fn new_stream(path: PathBuf, channels: u16, sample_rate: u32, frames: u64, peaks: Vec<Peaks>) -> Self {
+        SourceAudio { data: AudioData::Stream { path, channels, sample_rate, frames }, peaks }
     }
     pub fn frames(&self) -> usize {
-        self.buffer.frames()
+        self.data.frame_count() as usize
     }
     pub fn channel(&self, ch: usize) -> Option<&[f32]> {
-        self.buffer.channels.get(ch).map(Vec::as_slice)
+        match &self.data {
+            AudioData::Ram(b) => b.channels.get(ch).map(Vec::as_slice),
+            AudioData::Stream { .. } => None,
+        }
+    }
+    pub fn num_channels(&self) -> usize {
+        self.data.num_channels()
     }
 }
 

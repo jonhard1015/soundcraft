@@ -130,17 +130,39 @@ pub(crate) fn render_clip(s: &Session, clip: &Clip, pos: Samples, frames: usize,
     let block = Range { start: pos, end: pos.saturating_add(frames as i64) };
     let Some(isect) = clip.range().intersect(&block) else { return };
     let Some(audio) = s.pool.get(source) else { return };
-    let nsrc = audio.buffer.channels.len();
+    let nsrc = audio.num_channels();
     if nsrc == 0 {
         return;
     }
     let stretch = if clip.stretch.is_finite() && clip.stretch > 0.0 { clip.stretch } else { 1.0 };
     let i0 = usize::try_from(isect.start - pos).unwrap_or(0);
     let i1 = usize::try_from(isect.end - pos).unwrap_or(0).min(frames);
+
+    // For disk-streaming sources, read the needed window from disk once per clip render.
+    use soundcraft_model::source::AudioData;
+    let streamed: Option<Vec<Vec<f32>>> = match &audio.data {
+        AudioData::Stream { path, channels, sample_rate, .. } => {
+            let start = usize::try_from(offset.saturating_add(isect.start - clip.start)).unwrap_or(0) as u64;
+            Some(soundcraft_audio_io::stream_reader::read_frames_from_file(
+                path, start, i1 - i0, *channels as usize, *sample_rate,
+            ))
+        }
+        AudioData::Ram(_) => None,
+    };
+
     // Gain is evaluated every 32 samples and interpolated (fades and envelopes stay smooth).
     const STEP: usize = 32;
     for (ch, dst) in buf.iter_mut().enumerate() {
-        let src = audio.buffer.channels.get(ch % nsrc).map(Vec::as_slice).unwrap_or(&[]);
+        let owned_slice: Vec<f32>;
+        let src: &[f32] = if let Some(ref s) = streamed {
+            owned_slice = s.get(ch % nsrc).cloned().unwrap_or_default();
+            &owned_slice
+        } else {
+            match &audio.data {
+                AudioData::Ram(b) => b.channels.get(ch % nsrc).map(Vec::as_slice).unwrap_or(&[]),
+                AudioData::Stream { .. } => &[],
+            }
+        };
         let mut i = i0;
         while i < i1 {
             let seg_end = (i + STEP).min(i1);
@@ -153,7 +175,10 @@ pub(crate) fn render_clip(s: &Session, clip: &Clip, pos: Samples, frames: usize,
             let n = (seg_end - i).saturating_sub(1).max(1) as f32;
             for k in i..seg_end {
                 let rel = pos.saturating_add(k as i64).saturating_sub(clip.start);
-                let v = if (stretch - 1.0).abs() < 1e-9 {
+                let v = if streamed.is_some() {
+                    // streamed src is relative to i0 (we seeked to the right position already)
+                    src.get(k - i0).copied().unwrap_or(0.0)
+                } else if (stretch - 1.0).abs() < 1e-9 {
                     usize::try_from(offset.saturating_add(rel)).ok().and_then(|x| src.get(x)).copied().unwrap_or(0.0)
                 } else {
                     let f = offset as f64 + rel as f64 / stretch;

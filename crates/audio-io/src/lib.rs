@@ -23,6 +23,7 @@ mod pcm;
 pub mod peaks;
 mod symph;
 mod wav;
+pub mod stream_reader;
 
 pub use buffer::AudioBuffer;
 use std::io::{Seek, Write};

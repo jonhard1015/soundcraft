@@ -28,6 +28,10 @@ soundcraft-ui-egui = { path = "crates/ui-egui" }
 
 # foundation
 thiserror = "2"
+clap = { version = "4", features = ["derive"] }
+clap_complete = "4"
+clap_mangen = "0.1"
+same-file = "1"
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = { version = "1", features = ["float_roundtrip"] }
 log = "0.4"
@@ -55,6 +59,7 @@ egui = { version = "0.37" }
 eframe = { version = "0.37", default-features = false }
 # Monotonic clock on native and the browser (the `web_time::Instant` panics-free equivalent).
 web-time = "1.1"
+egui_extras = { version = "0.37" }
 egui_kittest = "0.37"
 rfd = "0.17"
 image = { version = "0.25", default-features = false, features = ["png"] }

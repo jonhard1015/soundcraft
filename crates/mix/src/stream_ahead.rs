@@ -105,3 +105,50 @@ fn prefetch_loop(windows: &Arc<Mutex<HashMap<PathBuf, Window>>>, requests: Recei
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use soundcraft_audio_io::{AudioBuffer, EncodeOptions};
+
+    /// A cold `read` nudges the background thread, which then warms the cache; once warm, a
+    /// `read` for the same window returns the exact samples that were on disk.
+    #[test]
+    fn warm_cache_hit_returns_the_right_samples() {
+        let dir = std::env::temp_dir().join(format!("sc-stream-ahead-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let rate = 48_000u32;
+        let frames = rate as usize * 2;
+        let tone: Vec<f32> = (0..frames).map(|i| (i % 97) as f32 / 97.0 - 0.5).collect();
+        let buf = AudioBuffer { sample_rate: rate, channels: vec![tone.clone()] };
+        let bytes = soundcraft_audio_io::encode(&buf, &EncodeOptions::default()).unwrap();
+        let path = dir.join("tone.wav");
+        std::fs::write(&path, bytes).unwrap();
+
+        let cache = StreamAheadCache::new();
+        // First call is a guaranteed miss: nothing's cached yet, but it nudges the worker.
+        assert!(cache.read(&path, 1, rate, 0, 256).is_none());
+
+        let want = 256;
+        let mut hit = None;
+        for _ in 0..200 {
+            if let Some(h) = cache.read(&path, 1, rate, 0, want) {
+                hit = Some(h);
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        let hit = hit.expect("background thread should have warmed the cache within 1s");
+        assert_eq!(hit.len(), 1);
+        // Round-tripped through a WAV encode/decode, so compare with the tolerance that format's
+        // quantization allows rather than bit-exact equality.
+        for (a, b) in hit[0].iter().zip(tone[0..want].iter()) {
+            assert!((a - b).abs() < 1e-3, "{a} vs {b}");
+        }
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}

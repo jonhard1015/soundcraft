@@ -135,21 +135,41 @@ impl DecodedImport {
 
 /// Reads and decodes the audio file at `path` for a session at `rate`. Thread-safe and slow (the
 /// whole file is read, decoded, resampled and given peaks): run it off the UI thread.
+/// A source imported unchanged from a file already at the session rate, and longer than this,
+/// is disk-streamed instead of decoded into RAM.
+const DISK_STREAM_THRESHOLD_SECONDS: u64 = 30;
+
 pub fn decode_import(path: &str, rate: u32) -> Result<DecodedImport> {
     let bytes = read_file(path)?;
     let name = Path::new(path).file_name().and_then(OsStr::to_str).unwrap_or("Audio");
-    let (info, audio) = decode_import_bytes(name, &bytes, rate)?;
+    let (info, buf) = decode_and_resample(name, &bytes, rate)?;
+    let frames = buf.frames() as u64;
+    // Streaming only makes sense when the file on disk already matches the session rate: the
+    // stream reader plays it back verbatim, with no resampling.
+    let audio = if info.sample_rate == rate && frames > rate as u64 * DISK_STREAM_THRESHOLD_SECONDS {
+        let channels = u16::try_from(buf.channels.len()).unwrap_or(u16::MAX);
+        let peaks = buf.channels.iter().map(|c| soundcraft_audio_io::peaks::Peaks::build(c)).collect();
+        Arc::new(SourceAudio::new_stream(PathBuf::from(path), channels, rate, frames, peaks))
+    } else {
+        Arc::new(SourceAudio::new(buf))
+    };
     Ok(DecodedImport { key: file_key(Path::new(path)), rate, info, audio })
 }
 
 fn decode_import_bytes(name: &str, bytes: &[u8], rate: u32) -> Result<(soundcraft_audio_io::AudioInfo, Arc<SourceAudio>)> {
+    let (info, buf) = decode_and_resample(name, bytes, rate)?;
+    Ok((info, Arc::new(SourceAudio::new(buf))))
+}
+
+/// Decodes and resamples to `rate`, refusing an empty or implausibly large result.
+fn decode_and_resample(name: &str, bytes: &[u8], rate: u32) -> Result<(soundcraft_audio_io::AudioInfo, AudioBuffer)> {
     let ext = Path::new(name).extension().and_then(OsStr::to_str).map(str::to_ascii_lowercase);
     let (info, buf) = soundcraft_audio_io::decode(bytes, ext.as_deref()).map_err(|err| EngineError::Io(format!("{name}: {err}")))?;
     let buf = at_rate(buf, rate, MAX_IMPORT_SAMPLES).map_err(|e| EngineError::Io(format!("{name}: {}", e.message("file is too large to import"))))?;
     if buf.frames() == 0 {
         return Err(EngineError::Io(format!("{name}: no audio")));
     }
-    Ok((info, Arc::new(SourceAudio::new(buf))))
+    Ok((info, buf))
 }
 
 /// Decode and place an audio file. With no target track, a new track of matching width is made.

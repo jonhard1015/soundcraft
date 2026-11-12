@@ -52,6 +52,50 @@ fn import_audio_places_audio_offered_by_a_worker() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// A file well past the disk-streaming threshold is not decoded fully into RAM: the source
+/// streams from disk, still gets real waveform peaks, and round-trips through a save and reopen.
+#[test]
+fn import_of_a_long_file_streams_from_disk_and_round_trips_through_save() {
+    let dir = std::env::temp_dir().join(format!("sc-import-stream-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+
+    let mut e = Engine::default();
+    let rate = e.session().sample_rate.hz();
+    // One second past the 30-second disk-streaming threshold.
+    let frames = rate as usize * 31;
+    let tone: Vec<f32> = (0..frames).map(|i| (i % 97) as f32 / 97.0 - 0.5).collect();
+    let buf = AudioBuffer { sample_rate: rate, channels: vec![tone] };
+    let bytes = soundcraft_audio_io::encode(&buf, &EncodeOptions::default()).unwrap();
+    let wav = dir.join("long.wav");
+    std::fs::write(&wav, bytes).unwrap();
+    let wav = wav.to_string_lossy().into_owned();
+
+    let decoded = crate::io::decode_import(&wav, rate).unwrap();
+    assert_eq!(decoded.frames(), frames);
+    e.offer_import(decoded);
+    e.execute("file.import_audio", &json!({"path": wav})).unwrap();
+
+    let source_id = e.session().sources[0].id;
+    let audio = e.session().pool.get(source_id).unwrap();
+    assert!(matches!(audio.data, soundcraft_model::AudioData::Stream { .. }), "a long, unresampled import should stream from disk");
+    assert!(!audio.peaks.is_empty(), "a streamed source still needs waveform peaks");
+
+    let scraft = dir.join("session.scraft").to_string_lossy().into_owned();
+    crate::io::save_session(&mut e, &scraft).unwrap();
+    assert!(!e.session().sources[0].unsaved);
+    let stored = e.session().sources[0].path.clone();
+    assert!(stored.starts_with("Audio Files/"), "{stored}");
+    assert!(dir.join(&stored).exists(), "the streamed source's audio must actually be written on save");
+
+    // Reopening confirms the file that was written decodes back to the same length.
+    let mut e2 = Engine::default();
+    crate::io::open_session(&mut e2, &scraft).unwrap();
+    assert_eq!(e2.session().sources[0].frames, frames as u64);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 #[test]
 fn export_session_text_needs_replace_to_overwrite() {
     let dir = std::env::temp_dir().join(format!("sc-export-text-replace-{}", std::process::id()));

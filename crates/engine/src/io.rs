@@ -695,7 +695,19 @@ fn write_session(session: &Session, path: &str, overwrite: bool) -> Result<(Sess
     };
     let mut written = 0;
     for (stem, audio, sources) in &pending {
-        let Some(buf) = audio.ram() else { continue }; // streamed sources already live on disk
+        let owned_ram;
+        let buf = match audio.ram() {
+            Some(b) => b,
+            None => {
+                let frames = audio.frames();
+                let channels = audio.num_channels();
+                let sample_rate = audio.data.sample_rate();
+                let soundcraft_model::AudioData::Stream { path, .. } = &audio.data else { unreachable!() };
+                let chans = soundcraft_audio_io::stream_reader::read_frames_from_file(path, 0, frames, channels, sample_rate);
+                owned_ram = soundcraft_audio_io::AudioBuffer { sample_rate, channels: chans };
+                &owned_ram
+            }
+        };
         make_dir(&audio_dir)?;
         let opts = EncodeOptions { format: FileFormat::Wav, bit_depth: soundcraft_audio_io::BitDepth::Float32, dither: false, bwf: None };
         let bytes = soundcraft_audio_io::encode(buf, &opts).map_err(|err| EngineError::Io(err.to_string()))?;

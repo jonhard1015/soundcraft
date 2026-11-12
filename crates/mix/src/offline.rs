@@ -157,7 +157,7 @@ pub fn render_clips(s: &Session, track: TrackId, range: Range) -> Vec<Vec<f32>> 
     let max_tail = s.sample_rate.samples(MAX_CLIP_FX_TAIL_SECONDS).max(0);
     for c in t.clips().iter().filter(|c| !c.muted && c.range().overlaps(&range)) {
         match clip_fx_params(s, c.id.0) {
-            None => render_clip(s, c, range.start, len, &mut out, &mut scratch),
+            None => render_clip(s, c, range.start, len, &mut out, &mut scratch, None),
             Some(params) => {
                 if block.len() != out.len() {
                     block = vec![vec![0.0f32; CLIP_FX_BLOCK]; out.len()];
@@ -195,7 +195,7 @@ pub fn render_clips(s: &Session, track: TrackId, range: Range) -> Vec<Vec<f32>> 
                         ch.fill(0.0);
                     }
                     if done < clip_end {
-                        render_clip(s, c, range.start.saturating_add(done as i64), n, &mut block, &mut scratch);
+                        render_clip(s, c, range.start.saturating_add(done as i64), n, &mut block, &mut scratch, None);
                     }
                     fx.process(&mut block, n);
                     let mut peak = 0.0f32;

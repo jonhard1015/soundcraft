@@ -125,7 +125,15 @@ impl ClipFx {
     }
 }
 
-pub(crate) fn render_clip(s: &Session, clip: &Clip, pos: Samples, frames: usize, buf: &mut [Vec<f32>], _scratch: &mut [f32]) {
+pub(crate) fn render_clip(
+    s: &Session,
+    clip: &Clip,
+    pos: Samples,
+    frames: usize,
+    buf: &mut [Vec<f32>],
+    _scratch: &mut [f32],
+    cache: Option<&crate::stream_ahead::StreamAheadCache>,
+) {
     let ClipContent::Audio { source, offset } = clip.content else { return };
     let block = Range { start: pos, end: pos.saturating_add(frames as i64) };
     let Some(isect) = clip.range().intersect(&block) else { return };
@@ -138,14 +146,19 @@ pub(crate) fn render_clip(s: &Session, clip: &Clip, pos: Samples, frames: usize,
     let i0 = usize::try_from(isect.start - pos).unwrap_or(0);
     let i1 = usize::try_from(isect.end - pos).unwrap_or(0).min(frames);
 
-    // For disk-streaming sources, read the needed window from disk once per clip render.
+    // For disk-streaming sources, prefer an already-decoded window from the read-ahead cache
+    // (never blocks); fall back to a direct blocking read on a miss (startup, or just after a
+    // seek the background thread hasn't caught up to yet).
     use soundcraft_model::AudioData;
     let streamed: Option<Vec<Vec<f32>>> = match &audio.data {
         AudioData::Stream { path, channels, sample_rate, .. } => {
             let start = usize::try_from(offset.saturating_add(isect.start - clip.start)).unwrap_or(0) as u64;
-            Some(soundcraft_audio_io::stream_reader::read_frames_from_file(
-                path, start, i1 - i0, *channels as usize, *sample_rate,
-            ))
+            let want = i1 - i0;
+            cache.and_then(|c| c.read(path, *channels, *sample_rate, start, want)).or_else(|| {
+                Some(soundcraft_audio_io::stream_reader::read_frames_from_file(
+                    path, start, want, *channels as usize, *sample_rate,
+                ))
+            })
         }
         AudioData::Ram(_) => None,
     };

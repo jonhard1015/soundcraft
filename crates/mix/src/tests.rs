@@ -1219,7 +1219,7 @@ fn render_clips_full_span(s: &Session, track: TrackId, range: Range) -> Vec<Vec<
     for c in t.clips().iter().filter(|c| !c.muted && c.range().overlaps(&range)) {
         let params = crate::clips::clip_fx_params(s, c.id.0).unwrap();
         let mut tmp = vec![vec![0.0f32; len]; out.len()];
-        crate::clips::render_clip(s, c, range.start, len, &mut tmp, &mut scratch);
+        crate::clips::render_clip(s, c, range.start, len, &mut tmp, &mut scratch, None);
         let mut fx = crate::clips::ClipFx::new(48_000.0, tmp.len());
         fx.configure(params);
         for done in (0..len).step_by(4096) {

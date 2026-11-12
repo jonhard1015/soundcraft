@@ -69,6 +69,7 @@ mod midi;
 mod offline;
 mod pan;
 mod routing;
+mod stream_ahead;
 mod strip;
 mod threads;
 
@@ -153,6 +154,13 @@ pub struct MixEngine {
     retired: Vec<Box<dyn Plugin>>,
     /// Ownership workspace reused for parallel strip processing.
     work: Vec<(usize, Strip)>,
+    /// Whether the session has any disk-streamed source, computed in `sync`; the read-ahead
+    /// cache's background thread is only spawned once one is actually in use.
+    has_streamed_sources: bool,
+    /// Read-ahead cache for disk-streamed sources, lazily created in `render` the first time
+    /// `has_streamed_sources` is true. `Arc`'d so `render` can clone it out to a local, detaching
+    /// the reference it hands `process_strip` from any further borrow of `self`.
+    stream_cache: Option<Arc<stream_ahead::StreamAheadCache>>,
 }
 
 impl MixEngine {
@@ -185,6 +193,8 @@ impl MixEngine {
             adopt: HashMap::new(),
             retired: Vec::new(),
             work: Vec::new(),
+            has_streamed_sources: false,
+            stream_cache: None,
         }
     }
 
@@ -276,6 +286,7 @@ impl MixEngine {
     /// Bring plugin instances in line with the session (creates/destroys as needed). Allocates;
     /// call outside the realtime thread when the document changes, or let `render` do it.
     pub fn sync(&mut self, s: &Session) {
+        self.has_streamed_sources = s.pool.ids().filter_map(|id| s.pool.get(id)).any(|a| matches!(a.data, soundcraft_model::AudioData::Stream { .. }));
         let mb = self.max_block;
         let main_ch = main_channels(s);
         self.main_fmt = s.main_format();
@@ -380,6 +391,11 @@ impl MixEngine {
         }
         self.last_end = pos.saturating_add(frames as i64);
         self.ensure_synced(s);
+        if self.has_streamed_sources && self.stream_cache.is_none() {
+            self.stream_cache = Some(Arc::new(stream_ahead::StreamAheadCache::new()));
+        }
+        let cache_arc = self.stream_cache.clone();
+        let cache = cache_arc.as_deref();
         for b in self.busses.values_mut() {
             for c in b.buf.iter_mut() {
                 c.iter_mut().take(frames).for_each(|x| *x = 0.0);
@@ -410,7 +426,7 @@ impl MixEngine {
         let live_in = LiveInput { midi: &self.live_midi, input: &self.input, monitor_only: self.monitor_only, recording: self.recording };
         run_strips(&mut work, |(i, st)| {
             if let Some(t) = s.tracks.get(*i) {
-                process_strip(s, t, st, &busses, &live_in, pos, frames, any_solo);
+                process_strip(s, t, st, &busses, &live_in, pos, frames, any_solo, cache);
             }
         });
         self.busses = busses;
@@ -489,7 +505,7 @@ impl MixEngine {
                 st.scratch.resize(self.max_block, 0.0);
             }
             let live_in = LiveInput { midi: &self.live_midi, input: &self.input, monitor_only: self.monitor_only, recording: self.recording };
-            process_strip(s, t, &mut st, &self.busses, &live_in, pos, frames, any_solo);
+            process_strip(s, t, &mut st, &self.busses, &live_in, pos, frames, any_solo, cache);
             let ch = st.buf.len();
             st.align.set(if pdc { lmax_a.saturating_sub(st.latency) } else { 0 }, ch);
             st.align.process(&mut st.buf, frames);

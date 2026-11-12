@@ -215,6 +215,7 @@ pub(crate) fn process_strip(
     pos: Samples,
     frames: usize,
     any_solo: bool,
+    cache: Option<&crate::stream_ahead::StreamAheadCache>,
 ) {
     for c in strip.buf.iter_mut() {
         c.iter_mut().take(frames).for_each(|x| *x = 0.0);
@@ -246,7 +247,7 @@ pub(crate) fn process_strip(
                     continue;
                 }
                 match clip_fx_params(s, clip.id.0) {
-                    None => render_clip(s, clip, pos, frames, &mut strip.buf, &mut strip.scratch),
+                    None => render_clip(s, clip, pos, frames, &mut strip.buf, &mut strip.scratch, cache),
                     Some(params) => {
                         let nch = strip.buf.len();
                         if strip.clipbuf.len() != nch || strip.clipbuf.first().map_or(0, Vec::len) < frames {
@@ -255,7 +256,7 @@ pub(crate) fn process_strip(
                         for c in strip.clipbuf.iter_mut() {
                             c.iter_mut().take(frames).for_each(|x| *x = 0.0);
                         }
-                        render_clip(s, clip, pos, frames, &mut strip.clipbuf, &mut strip.scratch);
+                        render_clip(s, clip, pos, frames, &mut strip.clipbuf, &mut strip.scratch, cache);
                         let fx = strip.clip_fx.entry(clip.id.0).or_insert_with(|| ClipFx::new(s.sample_rate.as_f64() as f32, nch));
                         fx.configure(params);
                         fx.process(&mut strip.clipbuf, frames);

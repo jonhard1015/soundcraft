@@ -160,6 +160,33 @@ pub fn file_found(path: impl AsRef<Path>) -> bool {
     crate::file_access::check_read(path).is_ok() && path.is_file()
 }
 
+/// List the `.scraft` files in `dir`, returning `(stem, mtime_unix_secs)` pairs.
+/// Returns an empty vec if the directory does not exist or is not readable.
+pub(crate) fn list_dir(dir: impl AsRef<std::path::Path>) -> Vec<(String, Option<u64>)> {
+    let dir = dir.as_ref();
+    if crate::file_access::check_read(dir).is_err() {
+        return Vec::new();
+    }
+    let Ok(entries) = std::fs::read_dir(dir) else { return Vec::new() };
+    let mut out = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|x| x.to_str()) != Some(soundcraft_model::SESSION_EXTENSION) {
+            continue;
+        }
+        let Some(name) = path.file_stem().and_then(|x| x.to_str()) else { continue };
+        let saved_at = entry
+            .metadata()
+            .ok()
+            .and_then(|m| m.modified().ok())
+            .and_then(|t| t.duration_since(std::time::SystemTime::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs());
+        out.push((name.to_string(), saved_at));
+    }
+    out
+}
+
+
 /// The file a path stored in the session file `session` refers to, or why it is not opened.
 ///
 /// Every path a session names (audio sources, movies) goes through here before it reaches the

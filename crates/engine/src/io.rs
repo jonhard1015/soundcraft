@@ -136,13 +136,6 @@ pub(crate) fn read_session_text(path: impl AsRef<Path>) -> Result<String> {
     utf8(path, read_file_within(path, true)?)
 }
 
-/// A bare `.scraft` handed over as bytes (the browser) as text: refused, uncopied, past
-/// [`session_limit`].
-pub(crate) fn session_bytes_text(name: &str, bytes: &[u8]) -> Result<String> {
-    session_size(name, bytes.len() as u64, false)?;
-    String::from_utf8(bytes.to_vec()).map_err(|_| EngineError::Io(format!("{name}: not a SoundCraft session")))
-}
-
 /// How many bytes [`Session::to_json`] makes of `s`, counted without keeping them.
 fn json_len(s: &Session) -> u64 {
     struct Count(u64);
@@ -702,9 +695,10 @@ fn write_session(session: &Session, path: &str, overwrite: bool) -> Result<(Sess
     };
     let mut written = 0;
     for (stem, audio, sources) in &pending {
+        let Some(buf) = audio.ram() else { continue }; // streamed sources already live on disk
         make_dir(&audio_dir)?;
         let opts = EncodeOptions { format: FileFormat::Wav, bit_depth: soundcraft_audio_io::BitDepth::Float32, dither: false, bwf: None };
-        let bytes = soundcraft_audio_io::encode(&audio.buffer, &opts).map_err(|err| EngineError::Io(err.to_string()))?;
+        let bytes = soundcraft_audio_io::encode(buf, &opts).map_err(|err| EngineError::Io(err.to_string()))?;
         let (name, new) = store_wav(&audio_dir, stem, &bytes)?;
         for &i in sources {
             if let Some(src) = s.sources.get_mut(i) {

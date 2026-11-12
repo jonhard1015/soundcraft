@@ -88,6 +88,9 @@ impl SoundApp {
             last_rev: 0,
             fonts_ready: false,
             fonts_installed: false,
+            system_fonts: true,
+            preferences: preferences::PreferencesState::default(),
+            touched_sends: std::collections::HashSet::new(),
             theme_applied: None,
             docking_context: None,
             sim: None,
@@ -131,7 +134,7 @@ impl SoundApp {
             if self.fonts_installed {
                 self.fonts_ready = true;
             } else {
-                fonts::install(ctx);
+                fonts::install(ctx, self.system_fonts);
                 self.fonts_installed = true;
                 ctx.request_repaint();
             }
@@ -328,6 +331,7 @@ impl SoundApp {
         }
         panels::floating(self, &ctx);
         windows::show(self, &ctx);
+        preferences::show(self, &ctx);
         video_window::show(self, &ctx);
         ops_windows::show(self, &ctx);
         extra_windows::show(self, &ctx);

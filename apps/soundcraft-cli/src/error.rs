@@ -1,7 +1,6 @@
 use std::path::{Path, PathBuf};
 
 use soundcraft_audio_io::AudioError;
-use soundcraft_automation::RemoteError;
 use soundcraft_engine::EngineError;
 use soundcraft_engine::file_access::RootError;
 
@@ -30,8 +29,8 @@ pub(crate) enum CliError {
     /// text.
     #[error("{}: the path is not valid Unicode", .0.display())]
     NotUnicode(PathBuf),
-    #[error(transparent)]
-    Remote(#[from] RemoteError),
+    #[error("{0}")]
+    Remote(String),
     #[error(transparent)]
     Roots(#[from] RootError),
     #[error(transparent)]

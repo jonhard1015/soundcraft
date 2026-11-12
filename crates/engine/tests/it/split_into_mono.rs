@@ -54,7 +54,7 @@ fn split_into_mono_preserves_every_channel_and_clip_edit() {
             assert_ne!(mono_source, source);
             assert!(mono.clips().iter().all(|clip| clip.source() == Some(mono_source)));
             let data = e.session().pool.get(mono_source).unwrap();
-            assert_eq!(data.buffer.channels, vec![audio.buffer.channels[ch].clone()]);
+            assert_eq!(data.ram().unwrap().channels, vec![audio.ram().unwrap().channels[ch].clone()]);
             assert_eq!(data.peaks.len(), 1);
             let metadata = e.session().source(mono_source).unwrap();
             assert_eq!((metadata.channels, metadata.time_reference), (1, 123_456));

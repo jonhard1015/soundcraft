@@ -76,6 +76,9 @@ pub const UI_COMMANDS: &[(&str, &str, &str, Option<&str>)] = &[
     ("ui.bounce_dialog", "Bounce Mix…", "", None),
     ("ui.set", "Set UI State", "", None),
     ("ui.theme", "Appearance", "", None),
+    ("ui.reduce_visual_effects", "Reduce Visual Effects", "", None),
+    ("ui.undo_levels", "Undo Levels", "", None),
+    ("setup.preferences", "Preferences...", "Setup > Preferences...", None),
 ];
 
 /// Extra catalog mappings handled by the UI layer.
@@ -242,6 +245,12 @@ pub fn menu_bar(app: &mut SoundApp, ui: &mut egui::Ui) {
                     }
                     if ui.button("Session Audio Health").clicked() {
                         let _ = app.run("window.audio_health", json!({"value": true}));
+                    }
+                    if ui
+                        .add_enabled(!app.is_playing(), egui::Button::new("Preferences..."))
+                        .clicked()
+                    {
+                        let _ = run_ui_command(app, "setup.preferences", &json!({}));
                     }
                     ui.separator();
                     if ui.button("Quit").clicked() {
@@ -524,6 +533,12 @@ pub fn run_ui_command(app: &mut SoundApp, id: &str, p: &Value) -> Option<Result<
     if id == "ui.audio_device" {
         return Some(crate::windows::audio_device_command(app, p));
     }
+    if matches!(id, "setup.hardware" | "setup.playback_engine") {
+        return Some(crate::windows::setup_audio_command(app, id, p));
+    }
+    if matches!(id, "setup.hardware" | "setup.playback_engine") {
+        return Some(crate::windows::setup_audio_command(app, id, p));
+    }
     let toggle = |v: &mut bool| {
         *v = p.get("value").and_then(Value::as_bool).unwrap_or(!*v);
         json!({"value": *v})
@@ -635,6 +650,8 @@ pub fn run_ui_command(app: &mut SoundApp, id: &str, p: &Value) -> Option<Result<
         "window.video" => toggle(&mut app.ui.show_video),
         "window.video_universe" => toggle(&mut app.ui.show_video_universe),
         "window.close" | "window.hide_floating" => {
+            app.ui.show_preferences = false;
+            app.preferences.discard_draft();
             app.ui.show_transport = false;
             app.ui.show_big_counter = false;
             app.ui.show_memory_locations = false;
@@ -694,6 +711,31 @@ pub fn run_ui_command(app: &mut SoundApp, id: &str, p: &Value) -> Option<Result<
             };
             app.ui.theme = mode;
             json!({"mode": mode.id()})
+        }
+        "ui.reduce_visual_effects" => {
+            let Some(mode) = p.get("mode").and_then(Value::as_str) else {
+                return Some(Ok(json!({"mode": app.ui.reduce_visual_effects.id()})));
+            };
+            let Some(mode) = crate::preferences::ReduceVisualEffects::parse(mode) else {
+                return Some(Err(format!("unknown reduce-visual-effects mode `{mode}` (never, playback or always)")));
+            };
+            app.ui.reduce_visual_effects = mode;
+            json!({"mode": mode.id()})
+        }
+        "ui.undo_levels" => {
+            let Some(levels) = p.get("levels").and_then(Value::as_u64) else {
+                return Some(Err("ui.undo_levels: pass `levels`".into()));
+            };
+            let levels = (levels as usize).clamp(1, 64);
+            app.ui.undo_levels = levels;
+            app.engine.set_history_limit(levels);
+            json!({"levels": levels})
+        }
+        // Discarding unconditionally guarantees that a draft left behind by a close through
+        // another route (e.g. `ui.set`) never leaks into the next open.
+        "setup.preferences" => {
+            app.preferences.discard_draft();
+            toggle(&mut app.ui.show_preferences)
         }
         "ui.set" => match serde_json::to_value(&app.ui) {
             Ok(mut cur) => {

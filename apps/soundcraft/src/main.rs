@@ -177,24 +177,23 @@ fn services() -> Services {
                     &["wav", "wave", "bwf", "aif", "aiff", "aifc", "flac", "mp3", "ogg", "oga", "m4a", "m4b", "aac", "mp4", "caf", "mkv", "webm"],
                 ),
             };
-            d.pick_file().map(|p| p.to_string_lossy().into_owned())
+            d.pick_file()
         })),
-        pick_save: Some(Box::new(|purpose: &str, default: &str| {
-            let path = std::path::Path::new(default);
+        pick_save: Some(Box::new(|purpose: &str, default: &std::path::Path| {
             let mut d = match purpose {
                 "file.bounce_mix" => rfd::FileDialog::new().add_filter("Audio", &["wav", "aif", "aiff", "flac"]),
                 _ => rfd::FileDialog::new().add_filter("WABTY Studio Session", &["scraft"]),
             };
-            if let Some(dir) = path.parent().filter(|dir| dir.is_dir()) {
+            if let Some(dir) = default.parent().filter(|dir| dir.is_dir()) {
                 d = d.set_directory(dir);
             }
-            if let Some(n) = path.file_name().and_then(std::ffi::OsStr::to_str) {
+            if let Some(n) = default.file_name().and_then(std::ffi::OsStr::to_str) {
                 d = d.set_file_name(n);
             }
-            d.save_file().map(|p| p.to_string_lossy().into_owned())
+            d.save_file()
         })),
-        pick_folder: Some(Box::new(|start: &str| {
-            rfd::FileDialog::new().set_directory(start).pick_folder().map(|p| p.to_string_lossy().into_owned())
+        pick_folder: Some(Box::new(|start: &std::path::Path| {
+            rfd::FileDialog::new().set_directory(start).pick_folder()
         })),
     }
 }
@@ -212,7 +211,7 @@ fn app_icon() -> Option<egui::IconData> {
 fn main() -> eframe::Result {
     // First, so every start-up record (and the engine's panic hook, installed with the first
     // Engine) is captured; see `logging`.
-    let logger = logging::install();
+    let logger = logging::install(None);
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.iter().any(|a| a == "--version" || a == "-V") {
         println!("WABTY Studio {}", env!("CARGO_PKG_VERSION"));

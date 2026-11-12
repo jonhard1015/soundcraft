@@ -335,8 +335,8 @@ fn import_surround_creates_a_matching_track() {
     assert_eq!(e.session().tracks[0].format, ChannelFormat::Surround51);
     let src = e.session().sources[0].id;
     let audio = e.session().pool.get(src).unwrap();
-    assert_eq!(audio.buffer.channels.len(), 6);
-    assert!((audio.buffer.channels[5][0] - 0.6).abs() < 1e-3);
+    assert_eq!(audio.ram().unwrap().channels.len(), 6);
+    assert!((audio.ram().unwrap().channels[5][0] - 0.6).abs() < 1e-3);
 
     let mut e = Engine::default();
     e.execute("track.new", &json!({"name": "Bed", "format": "5.1"})).unwrap();

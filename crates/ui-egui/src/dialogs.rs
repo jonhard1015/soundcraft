@@ -1182,7 +1182,7 @@ mod tests {
             let clip = e.session().track_by_name("Kick").unwrap().clips()[0].id;
             e.execute("audiosuite.process", &json!({"process": "speed_ramp", "params": params, "clips": [clip.0]})).unwrap();
             let c = e.session().track_by_name("Kick").unwrap().clips()[0].clone();
-            (c.length, e.session().pool.get(c.source().unwrap()).unwrap().buffer.channels.clone())
+            (c.length, e.session().pool.get(c.source().unwrap()).unwrap().ram().unwrap().channels.clone())
         };
         let defaults: serde_json::Map<String, Value> = SPEED_RAMP_CHOICES.iter().map(|(id, _, d, _)| (id.to_string(), json!(d))).collect();
         let (length, audio) = render(Value::Object(defaults));

@@ -1,6 +1,6 @@
 use super::clips::Key;
 use super::strip::{PluginSlot, Strip};
-use super::{ClipContent, CtrlKind, Range, SampleSource, Samples, Session, SourceAudio, Track};
+use super::{ClipContent, CtrlKind, SampleSource, Samples, Session, SourceAudio, Track};
 use std::sync::Arc;
 
 /// The track's MIDI Track Offset (`midi.offset.<id>` in the edit values), in samples. Looked up
@@ -216,10 +216,10 @@ struct PoolSample(Arc<SourceAudio>);
 
 impl SampleSource for PoolSample {
     fn sample_rate(&self) -> f32 {
-        self.0.buffer.sample_rate as f32
+        self.0.data.sample_rate() as f32
     }
     fn num_channels(&self) -> usize {
-        self.0.buffer.num_channels()
+        self.0.data.num_channels()
     }
     fn channel(&self, ch: usize) -> Option<&[f32]> {
         self.0.channel(ch)

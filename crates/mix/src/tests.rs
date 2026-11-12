@@ -1069,7 +1069,7 @@ fn multichannel_session(fmt: ChannelFormat, main: ChannelFormat, frames: usize) 
 #[test]
 fn surround_track_passes_through_bit_exact() {
     let (s, _) = multichannel_session(ChannelFormat::Surround51, ChannelFormat::Surround51, 4800);
-    let src = s.pool.get(SourceId(901)).unwrap().buffer.channels.clone();
+    let src = s.pool.get(SourceId(901)).unwrap().ram().unwrap().channels.clone();
     let out = render_range(&s, Range::new(0, 4800), 512);
     assert_eq!(out.len(), 6);
     for (o, x) in out.iter().zip(src.iter()) {

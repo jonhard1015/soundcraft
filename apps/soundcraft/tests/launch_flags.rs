@@ -16,6 +16,8 @@ fn soundcraft(args: &[&str], control_port: &str) -> Output {
         .expect("run soundcraft")
 }
 
+#[cfg(all(unix, not(target_os = "macos")))]
+#[cfg(all(unix, not(target_os = "macos")))]
 #[test]
 fn a_bad_variable_is_a_usage_error_naming_it() {
     let out = soundcraft(&["--no-audio"], "nope");

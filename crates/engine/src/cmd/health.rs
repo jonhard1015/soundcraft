@@ -40,14 +40,16 @@ fn check_audio_clip(
         add("unavailable_audio", "Audio is not loaded; this clip will be silent. Restore the media and reopen the session, or reimport it.");
         return;
     };
-    if audio.buffer.sample_rate != ctx.session_sample_rate {
+    if audio.data.sample_rate() != ctx.session_sample_rate {
         add("sample_rate_mismatch", "Loaded audio differs from the session sample rate. Reimport it to convert to the session rate.");
     }
-    if audio.buffer.channels.is_empty() || audio.frames() == 0 {
+    if audio.num_channels() == 0 || audio.frames() == 0 {
         add("empty_audio", "Loaded audio has no playable frames. Reimport a valid audio file.");
         return;
     }
-    if audio.buffer.channels.iter().any(|channel| channel.len() != audio.frames()) {
+    if let Some(b) = audio.ram()
+        && b.channels.iter().any(|channel| channel.len() != audio.frames())
+    {
         add("uneven_channels", "Loaded audio channels have different lengths. Reimport a valid audio file; bounds below use the shortest channel.");
     }
     if !clip.stretch.is_finite() || clip.stretch <= 0.0 || clip.length <= 0 {

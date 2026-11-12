@@ -37,7 +37,7 @@ fn source_of_only_clip(e: &Engine, i: usize) -> (usize, f32) {
     let s = e.session();
     let c = &s.tracks[i].clips()[0];
     let audio = s.pool.get(c.source().unwrap()).unwrap();
-    (audio.buffer.frames(), audio.buffer.channels[0][0])
+    (audio.frames(), audio.ram().unwrap().channels[0][0])
 }
 
 fn assert_each_track_has(e: &Engine, start: i64, end: i64) {

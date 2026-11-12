@@ -84,7 +84,7 @@ fn not_found() -> std::io::Error {
 #[track_caller]
 fn assert_refused(got: &Invoke, port: u16) {
     assert_eq!((got.code, got.stdout.as_str()), (1, ""));
-    let prefix = format!("error: cannot reach SoundCraft at 127.0.0.1:{port}: ");
+    let prefix = format!("error: cannot reach WABTY Studio at 127.0.0.1:{port}: ");
     assert!(got.stderr.starts_with(&prefix) && got.stderr.contains(" (os error ") && got.stderr.ends_with(")\n"), "{}", got.stderr);
 }
 

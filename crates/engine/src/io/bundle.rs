@@ -59,7 +59,23 @@ fn session_bundle_within(session: &Session, limits: BundleLimits) -> Result<(Vec
             k += 1;
         }
         let opts_wav = EncodeOptions { format: FileFormat::Wav, bit_depth: soundcraft_audio_io::BitDepth::Float32, dither: false, bwf: None };
-        let bytes = soundcraft_audio_io::encode(&audio.buffer, &opts_wav).map_err(|err| EngineError::Io(err.to_string()))?;
+        let owned_ram;
+        let buf = match audio.ram() {
+            Some(b) => b,
+            None => {
+                let frames = audio.frames();
+                let channels = audio.num_channels();
+                let sample_rate = audio.data.sample_rate();
+                let path = match &audio.data {
+                    soundcraft_model::AudioData::Stream { path, .. } => path.clone(),
+                    soundcraft_model::AudioData::Ram(_) => unreachable!(),
+                };
+                let chans = soundcraft_audio_io::stream_reader::read_frames_from_file(&path, 0, frames, channels, sample_rate);
+                owned_ram = soundcraft_audio_io::AudioBuffer { sample_rate, channels: chans };
+                &owned_ram
+            }
+        };
+        let bytes = soundcraft_audio_io::encode(buf, &opts_wav).map_err(|err| EngineError::Io(err.to_string()))?;
         fits(bytes.len())?;
         w.start_file(target.as_str(), opts).map_err(zerr)?;
         w.write_all(&bytes).map_err(ioerr)?;
@@ -163,7 +179,7 @@ mod bundle_tests {
         assert_eq!(r.session().tracks.len(), e.session().tracks.len());
         for src in &e.session().sources {
             let (a, b) = (e.session().pool.get(src.id).unwrap(), r.session().pool.get(src.id).unwrap());
-            assert_eq!(a.buffer.channels, b.buffer.channels, "{}: float WAV keeps every sample", src.name);
+            assert_eq!(a.ram().unwrap().channels, b.ram().unwrap().channels, "{}: float WAV keeps every sample", src.name);
         }
         assert!(!r.is_dirty());
         assert_eq!(r.path.as_deref(), Some("Midnight Groove.scraftz"));

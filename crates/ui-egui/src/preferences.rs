@@ -1338,7 +1338,7 @@ mod tests {
             app,
         );
         harness.run_steps(4);
-        harness.get_by_label("SoundCraft").click();
+        harness.get_by_label("WABTY Studio").click();
         harness.run_steps(2);
         harness.get_by_label("Preferences...").click();
         harness.run_steps(2);
@@ -1358,7 +1358,7 @@ mod tests {
             app,
         );
         harness.run_steps(4);
-        harness.get_by_label("SoundCraft").click();
+        harness.get_by_label("WABTY Studio").click();
         harness.run_steps(2);
         assert!(harness.get_by_label("Preferences...").accesskit_node().is_disabled());
     }

@@ -66,7 +66,23 @@ pub fn export(e: &Engine, ids: &[ClipId], path: &str) -> Result<usize> {
                 let rel = format!("{audio_dir_name}/{}_{}.wav", crate::io::sanitize_name(&src.name), source.0);
                 crate::io::make_dir(dir.join(&audio_dir_name))?;
                 let opts = EncodeOptions { format: FileFormat::Wav, bit_depth: soundcraft_audio_io::BitDepth::Float32, dither: false, bwf: None };
-                let bytes = soundcraft_audio_io::encode(&buf.buffer, &opts).map_err(|err| EngineError::Io(err.to_string()))?;
+                let owned_ram;
+                let enc_buf = match buf.ram() {
+                    Some(b) => b,
+                    None => {
+                        let frames = buf.frames();
+                        let channels = buf.num_channels();
+                        let sample_rate = buf.data.sample_rate();
+                        let path = match &buf.data {
+                            soundcraft_model::AudioData::Stream { path, .. } => path.clone(),
+                            soundcraft_model::AudioData::Ram(_) => unreachable!(),
+                        };
+                        let chans = soundcraft_audio_io::stream_reader::read_frames_from_file(&path, 0, frames, channels, sample_rate);
+                        owned_ram = soundcraft_audio_io::AudioBuffer { sample_rate, channels: chans };
+                        &owned_ram
+                    }
+                };
+                let bytes = soundcraft_audio_io::encode(enc_buf, &opts).map_err(|err| EngineError::Io(err.to_string()))?;
                 crate::io::write_path(dir.join(&rel), bytes)?;
                 slot.insert(rel);
             }
@@ -154,7 +170,7 @@ pub fn import(e: &mut Engine, path: &str, first: Option<TrackId>, at: Samples) -
                 let channels = lane
                     .iter()
                     .find_map(|c| match c.content {
-                        ClipContent::Audio { source, .. } => map.get(&source.0).and_then(|n| s.pool.get(*n)).map(|a| a.buffer.num_channels()),
+                        ClipContent::Audio { source, .. } => map.get(&source.0).and_then(|n| s.pool.get(*n)).map(|a| a.num_channels()),
                         _ => None,
                     })
                     .unwrap_or(2);

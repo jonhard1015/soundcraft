@@ -1,13 +1,13 @@
 use super::args::McpArgs;
 use super::error::CliError;
-use soundcraft_automation::{ControlTarget, Headless, Remote, mcp::Server};
+use soundcraft_automation::{Headless, Remote, mcp::Server};
 use soundcraft_engine::Engine;
 use soundcraft_engine::file_access::{self, AutomationRoots};
 use std::io::Write;
 
 /// What `mcp` serves.
 struct Setup {
-    connect: Option<ControlTarget>,
+    connect: Option<String>,
     demo: bool,
     roots: Option<std::sync::Arc<AutomationRoots>>,
 }

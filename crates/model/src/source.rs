@@ -121,6 +121,16 @@ impl SourceAudio {
     pub fn num_channels(&self) -> usize {
         self.data.num_channels()
     }
+    pub fn sample_rate(&self) -> u32 {
+        self.data.sample_rate()
+    }
+    /// The full in-memory buffer, when this source is loaded into RAM (`None` for a disk-streamed source).
+    pub fn ram(&self) -> Option<&AudioBuffer> {
+        match &self.data {
+            AudioData::Ram(b) => Some(b),
+            AudioData::Stream { .. } => None,
+        }
+    }
 }
 
 /// Shared decoded audio, keyed by source id.

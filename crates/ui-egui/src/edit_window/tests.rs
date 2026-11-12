@@ -670,10 +670,10 @@ fn waveform_geometry(h: &Harness<SoundApp>, clip_rect: Rect) -> Vec<Vec<Pos2>> {
 /// Replace the clip's mono source with a stereo one whose right channel is half the left, and make the track stereo.
 fn make_stereo(h: &mut Harness<'static, SoundApp>, tid: soundcraft_model::TrackId, source: soundcraft_model::SourceId) {
     let audio = h.state().engine.session().pool.get(source).unwrap().clone();
-    let left = audio.buffer.channels[0].clone();
+    let left = audio.ram().unwrap().channels[0].clone();
     let right = left.iter().map(|sample| sample * 0.5).collect();
     let audio =
-        soundcraft_model::SourceAudio::new(soundcraft_audio_io::AudioBuffer { sample_rate: audio.buffer.sample_rate, channels: vec![left, right] });
+        soundcraft_model::SourceAudio::new(soundcraft_audio_io::AudioBuffer { sample_rate: audio.sample_rate(), channels: vec![left, right] });
     let s = h.state_mut().engine.session_mut();
     s.pool.insert(source, std::sync::Arc::new(audio));
     s.track_mut(tid).unwrap().format = soundcraft_model::ChannelFormat::Stereo;

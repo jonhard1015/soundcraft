@@ -156,9 +156,9 @@ pub fn sample_strip(app: &mut SoundApp, ui: &mut Ui, tid: TrackId, ins: &Insert)
     });
     let info = match (&source, &audio) {
         (Some(src), Some(a)) => {
-            let rate = a.buffer.sample_rate.max(1);
+            let rate = a.data.sample_rate().max(1);
             let secs = a.frames() as f64 / f64::from(rate);
-            let width = match a.buffer.num_channels() {
+            let width = match a.num_channels() {
                 1 => "mono".to_string(),
                 2 => "stereo".to_string(),
                 n => format!("{n} ch"),

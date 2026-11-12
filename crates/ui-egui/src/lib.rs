@@ -4,12 +4,10 @@
 //! executing commands. It can be replaced without touching anything below it.
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
-/// SoundCraft as craft-update knows it, with its 128 px icon and accent colour: the update
-/// prompt shows both, and an AppImage's menu entry gets the icon.
+/// SoundCraft as craft-update knows it, with its 128 px icon: an AppImage's menu entry gets it.
 #[cfg(not(target_arch = "wasm32"))]
 pub const UPDATE_APP: craft_update::app::App = craft_update::app::App {
-    icon_png: Some(include_bytes!("../../../assets/app-icon/hicolor/128x128/apps/ai.storyteller.soundcraft.png")),
-    accent: Some([0x1f, 0xa5, 0xc9]),
+    icon_png: Some(include_bytes!("../../../assets/app-icon/hicolor/128x128/apps/com.wabty.studio.png")),
     ..craft_update::suite::SOUNDCRAFT
 };
 

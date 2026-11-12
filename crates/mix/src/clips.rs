@@ -139,7 +139,7 @@ pub(crate) fn render_clip(s: &Session, clip: &Clip, pos: Samples, frames: usize,
     let i1 = usize::try_from(isect.end - pos).unwrap_or(0).min(frames);
 
     // For disk-streaming sources, read the needed window from disk once per clip render.
-    use soundcraft_model::source::AudioData;
+    use soundcraft_model::AudioData;
     let streamed: Option<Vec<Vec<f32>>> = match &audio.data {
         AudioData::Stream { path, channels, sample_rate, .. } => {
             let start = usize::try_from(offset.saturating_add(isect.start - clip.start)).unwrap_or(0) as u64;
@@ -179,7 +179,7 @@ pub(crate) fn render_clip(s: &Session, clip: &Clip, pos: Samples, frames: usize,
                     // streamed src is relative to i0 (we seeked to the right position already)
                     src.get(k - i0).copied().unwrap_or(0.0)
                 } else if (stretch - 1.0).abs() < 1e-9 {
-                    usize::try_from(offset.saturating_add(rel)).ok().and_then(|x| src.get(x)).copied().unwrap_or(0.0)
+                    usize::try_from(offset.saturating_add(rel)).ok().and_then(|x| src.get(x).copied()).unwrap_or(0.0)
                 } else {
                     let f = offset as f64 + rel as f64 / stretch;
                     let x0 = f.floor();

@@ -233,7 +233,7 @@ mod save_tests {
         save_session(&mut reopen(&path("B/B.scraft")), &path("A/B.scraft")).unwrap();
         let levels = ["A/A.scraft", "A/A v2.scraft", "B/B.scraft", "A/B.scraft"].map(|p| {
             let r = reopen(&path(p));
-            r.session().pool.get(r.session().sources[0].id).unwrap().buffer.channels[0][0]
+            r.session().pool.get(r.session().sources[0].id).unwrap().ram().unwrap().channels[0][0]
         });
         assert_eq!(levels, [0.5, -0.25, 0.75, 0.75]);
         let _ = std::fs::remove_dir_all(&dir);
@@ -275,7 +275,7 @@ mod save_tests {
         let dir = std::env::temp_dir().join(format!("soundcraft-own-folder-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let path = |p: &str| dir.join(p).to_string_lossy().into_owned();
-        let level = |r: &Engine| r.session().pool.get(r.session().sources[0].id).unwrap().buffer.channels[0][0];
+        let level = |r: &Engine| r.session().pool.get(r.session().sources[0].id).unwrap().ram().unwrap().channels[0][0];
         save_session(&mut with_take(-0.25), &path("B/Other.scraft")).unwrap();
         let mut e = with_take(0.5);
         save_session(&mut e, &path("A/A.scraft")).unwrap();
@@ -323,7 +323,7 @@ mod save_tests {
         bare.execute("session.save", &json!({})).unwrap();
         second.execute("session.save_as", &json!({"path": path, "replace": true})).unwrap();
         let r = reopen(&path);
-        assert_eq!(r.session().pool.get(r.session().sources[0].id).unwrap().buffer.channels[0][0], -0.25);
+        assert_eq!(r.session().pool.get(r.session().sources[0].id).unwrap().ram().unwrap().channels[0][0], -0.25);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

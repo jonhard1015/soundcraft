@@ -464,7 +464,7 @@ fn split_mono(e: &mut Engine, p: &Value) -> Result<Value> {
                 if let ClipContent::Audio { source, .. } = &mut c.content {
                     let audio =
                         s.pool.get(*source).ok_or_else(|| bad("track.split_into_mono", format!("audio unavailable for clip `{}`", c.name)))?;
-                    let channels = audio.buffer.channels.len();
+                    let channels = audio.num_channels();
                     if channels == 0 {
                         return Err(bad("track.split_into_mono", format!("audio has no channels for clip `{}`", c.name)));
                     }
@@ -475,8 +475,10 @@ fn split_mono(e: &mut Engine, p: &Value) -> Result<Value> {
                         let mono = if let Some(&id) = mono_sources.get(&key) {
                             id
                         } else {
-                            let samples =
-                                audio.buffer.channels.get(key.1).ok_or_else(|| bad("track.split_into_mono", "source channel unavailable"))?;
+                            let samples = audio
+                                .ram()
+                                .and_then(|b| b.channels.get(key.1))
+                                .ok_or_else(|| bad("track.split_into_mono", "source channel unavailable (streamed audio must be loaded into RAM to split)"))?;
                             copied_samples = copied_samples
                                 .checked_add(samples.len())
                                 .filter(|&n| n <= crate::io::MAX_IMPORT_SAMPLES)

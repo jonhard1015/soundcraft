@@ -248,8 +248,9 @@ impl Autosave {
         crate::io::session_size("the autosave", text.len() as u64, true)?;
         self.next = next;
         for (name, audio) in &fresh {
+            let Some(buf) = audio.ram() else { continue }; // streamed sources already live on disk
             let opts = EncodeOptions { format: FileFormat::Wav, bit_depth: BitDepth::Float32, dither: false, bwf: None };
-            let bytes = soundcraft_audio_io::encode(&audio.buffer, &opts).map_err(|err| EngineError::Io(err.to_string()))?;
+            let bytes = soundcraft_audio_io::encode(buf, &opts).map_err(|err| EngineError::Io(err.to_string()))?;
             create_folder(&audio_dir).and_then(|()| write_synced(&audio_dir.join(name), &bytes)).map_err(|err| io_error(&audio_dir, err))?;
         }
         write_atomically(&self.dir.join(ORIGIN), origin.unwrap_or_default().as_bytes())?;
@@ -531,7 +532,7 @@ mod tests {
 
     fn levels(e: &Engine) -> Vec<f32> {
         let s = e.session();
-        s.sources.iter().map(|src| s.pool.get(src.id).map_or(f32::NAN, |a| a.buffer.channels[0][0])).collect()
+        s.sources.iter().map(|src| s.pool.get(src.id).and_then(|a| a.ram()).map_or(f32::NAN, |b| b.channels[0][0])).collect()
     }
 
     #[test]

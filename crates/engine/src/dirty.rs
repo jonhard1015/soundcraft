@@ -67,10 +67,14 @@ fn track_values(track: &Track) -> impl PartialEq + '_ {
         ticks_timebase,
         elastic,
         pinned,
+        midi_input,
+        midi_output,
+        midi_channel,
     } = track;
     (
         (id, name, kind, format, color, height, playlists, active_playlist, mixer_values(mixer), automation, view),
         (hidden, inactive, frozen, comments, folder, folder_open, instrument, ticks_timebase, elastic, pinned),
+        (midi_input, midi_output, midi_channel),
     )
 }
 

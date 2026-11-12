@@ -157,7 +157,7 @@ pub fn render_stretched(s: &mut Session, cmd: &str, c: &Clip, out_len: Samples) 
     }
     // The source span read in can be 10× the output, and both are held for every channel: bound
     // each like any other offline render (a session's clip length and stretch are not trusted).
-    let channels = audio.buffer.channels.len().max(1);
+    let channels = audio.num_channels().max(1);
     let limit = crate::io::render_limit(channels);
     if src_len > limit as f64 || usize::try_from(out_len).map_or(true, |n| n > limit) {
         let secs = limit as f64 / s.sample_rate.as_f64();
@@ -165,8 +165,8 @@ pub fn render_stretched(s: &mut Session, cmd: &str, c: &Clip, out_len: Samples) 
     }
     let a = usize::try_from(offset.max(0)).unwrap_or(0);
     let n = src_len as usize;
-    let ch: Vec<Vec<f32>> = audio
-        .buffer
+    let ram = audio.ram().ok_or_else(|| bad(cmd, "streamed audio must be loaded into RAM to stretch"))?;
+    let ch: Vec<Vec<f32>> = ram
         .channels
         .iter()
         .map(|x| {
@@ -253,6 +253,6 @@ mod tests {
         // An ordinary stretch still renders, at the length asked for.
         let (mut s, clip) = stretched_clip(1_000, 0.5);
         let src = render_stretched(&mut s, "clip.remove_pitch_shift", &clip, clip.length).unwrap().unwrap();
-        assert!(s.pool.get(src).unwrap().buffer.channels.iter().all(|c| c.len() == 1_000));
+        assert!(s.pool.get(src).unwrap().ram().unwrap().channels.iter().all(|c| c.len() == 1_000));
     }
 }

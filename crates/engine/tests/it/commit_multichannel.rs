@@ -32,7 +32,7 @@ fn commit(e: &mut Engine, track: TrackId) -> TrackId {
 
 fn committed_audio(e: &Engine, track: TrackId) -> &AudioBuffer {
     let ClipContent::Audio { source, .. } = e.session().track(track).unwrap().clips()[0].content else { panic!("commit must create audio") };
-    &e.session().pool.get(source).unwrap().buffer
+    e.session().pool.get(source).unwrap().ram().unwrap()
 }
 
 fn assert_audio_eq(actual: &[Vec<f32>], expected: &[Vec<f32>]) {

@@ -2,7 +2,7 @@ use super::args::AppArgs;
 use super::error::CliError;
 use super::output::print_json;
 use serde_json::{Value, json};
-use soundcraft_automation::Remote;
+use soundcraft_automation::{Backend, Remote};
 use std::io::Write;
 
 /// Control-channel methods. Every other dotted id is an engine command.
@@ -44,7 +44,7 @@ pub(crate) fn app(args: &AppArgs, out: &mut dyn Write) -> Result<(), CliError> {
     let mut r = Remote::new(&args.control.port);
     // A bare command id is shorthand for engine.execute. Control-channel methods stay methods.
     let (m, p) = app_request(method, params);
-    let v = r.request(&m, p)?;
+    let v = r.call(&m, p).map_err(CliError::Remote)?;
     print_json(out, &v, args.compact);
     Ok(())
 }

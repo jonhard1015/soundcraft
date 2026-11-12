@@ -94,7 +94,7 @@ fn add_source_audio(s: &mut Session, name: &str, audio: Arc<SourceAudio>, path: 
         id,
         name: stem.clone(),
         path: stored,
-        channels: u16::try_from(audio.buffer.num_channels()).unwrap_or(u16::MAX),
+        channels: u16::try_from(audio.num_channels()).unwrap_or(u16::MAX),
         frames: audio.frames() as u64,
         sample_rate: s.sample_rate.hz(),
         format,
@@ -172,7 +172,7 @@ fn place_import(
     target: Option<TrackId>,
     at: Samples,
 ) -> Result<Value> {
-    let channels = audio.buffer.num_channels();
+    let channels = audio.num_channels();
     let file_rate = info.sample_rate;
     let s = e.session_mut();
     let session_rate = s.sample_rate.hz();

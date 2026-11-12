@@ -8,6 +8,7 @@ rust-version = "1.95"
 
 [dependencies]
 craft-ui.workspace = true
+craft-update.workspace = true
 soundcraft-time.workspace = true
 soundcraft-audio-io.workspace = true
 soundcraft-midi.workspace = true

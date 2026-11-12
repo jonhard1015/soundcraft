@@ -9,12 +9,94 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use clap::builder::NonEmptyStringValueParser;
-use clap::error::ErrorKind;
-use clap::{ArgAction, Args, CommandFactory, FromArgMatches, Parser, Subcommand, ValueEnum};
+use clap::error::{ContextKind, ContextValue, ErrorKind};
+use clap::{Arg, ArgAction, Args, CommandFactory, FromArgMatches, Parser, Subcommand, ValueEnum};
 use serde_json::{Value, json};
 use soundcraft_audio_io::FileFormat;
-use soundcraft_automation::ControlTarget;
-use soundcraft_automation::args::{AutomationArgs, ControlClientArgs, blank_env_is_unset, control_target, long_version, name_env_vars};
+
+/// The running app a client calls (`soundcraft-cli app`).
+#[derive(Args)]
+pub(crate) struct ControlClientArgs {
+    /// The app's control port or host:port
+    #[arg(long, value_name = "P", env = "SOUNDCRAFT_CONTROL_PORT", default_value = "7979", value_parser = control_target)]
+    pub(crate) port: String,
+}
+
+/// A validated `host:port`, with `127.0.0.1` filled in when no host was given: for
+/// `soundcraft-cli app --port`, `mcp --connect`, and SOUNDCRAFT_CONTROL_PORT.
+fn control_target(s: &str) -> Result<String, NotATarget> {
+    let (host, port) = host_and_port(s.trim())?;
+    Ok(format!("{}:{port}", host.unwrap_or("127.0.0.1")))
+}
+
+/// `PORT` or `HOST:PORT`, split. An IPv6 host goes in brackets (`[::1]:7979`), as a socket address
+/// is written: in `::1:7979` the host and port can't be told apart.
+fn host_and_port(s: &str) -> Result<(Option<&str>, u16), NotATarget> {
+    let (host, port) = match s.rsplit_once(':') {
+        Some(("", _)) => return Err(NotATarget),
+        Some((host, _)) if host.contains(':') && !(host.starts_with('[') && host.ends_with(']')) => return Err(NotATarget),
+        Some((host, port)) => (Some(host), port),
+        None => (None, s),
+    };
+    Ok((host, port.parse().map_err(|_| NotATarget)?))
+}
+
+/// A [`control_target`] value that is neither a port nor `host:port`.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+#[error("expected a port, 0-65535, or host:port")]
+struct NotATarget;
+
+/// Like [`control_target`], for `mcp --connect`, whose shorter message doesn't spell out the
+/// host:port form.
+fn connect_target(s: &str) -> Result<String, NotAConnectTarget> {
+    let (host, port) = host_and_port(s.trim()).map_err(|_| NotAConnectTarget)?;
+    Ok(format!("{}:{port}", host.unwrap_or("127.0.0.1")))
+}
+
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+#[error("expected a port")]
+struct NotAConnectTarget;
+
+/// The folders automation may touch. Once any root is given, files are confined to the roots, and
+/// a kind left out grants none of its access.
+#[derive(Args)]
+pub(crate) struct AutomationArgs {
+    /// A folder the agent's commands may read from; repeat for several
+    #[arg(long, value_name = "DIR", action = ArgAction::Append)]
+    pub(crate) automation_read_root: Vec<PathBuf>,
+    /// A folder the agent's commands may write to; repeat for several
+    #[arg(long, value_name = "DIR", action = ArgAction::Append)]
+    pub(crate) automation_write_root: Vec<PathBuf>,
+}
+
+/// `0.1.0 (linux x86_64)`: the workspace version and the platform the binary was built for.
+fn long_version() -> &'static str {
+    static LONG: OnceLock<String> = OnceLock::new();
+    LONG.get_or_init(|| format!("{} ({} {})", env!("CARGO_PKG_VERSION"), std::env::consts::OS, std::env::consts::ARCH))
+}
+
+/// For `Command::mut_args`: an empty or blank variable counts as unset.
+fn blank_env_is_unset(arg: Arg) -> Arg {
+    let blank = arg.get_env().and_then(std::env::var_os).is_some_and(|v| v.to_str().is_some_and(|v| v.trim().is_empty()));
+    if blank { arg.env(None::<&str>) } else { arg }
+}
+
+/// clap names the flag when a value from its variable is bad or conflicts with another; name the
+/// variable instead when the flag isn't among `args`.
+fn name_env_vars(mut error: clap::Error, cmd: &clap::Command, args: &[OsString]) -> clap::Error {
+    let given =
+        |long: &str| args.iter().filter_map(|a| a.to_str()?.strip_prefix("--")?.strip_prefix(long)).any(|r| r.is_empty() || r.starts_with('='));
+    let sub = args.first().and_then(|name| cmd.find_subcommand(name)).unwrap_or(cmd);
+    for kind in [ContextKind::InvalidArg, ContextKind::PriorArg] {
+        let Some(ContextValue::String(shown)) = error.get(kind) else { continue };
+        let Some(arg) = sub.get_arguments().find(|a| a.to_string() == *shown) else { continue };
+        let (Some(long), Some(var)) = (arg.get_long(), arg.get_env()) else { continue };
+        if !given(long) {
+            error.insert(kind, ContextValue::String(var.to_string_lossy().into_owned()));
+        }
+    }
+    error
+}
 
 /// Help text that names the extensions `list` gives, built once from
 /// [`FileFormat::readable_extensions`] or [`FileFormat::writable_extensions`] so it can't drift
@@ -216,8 +298,8 @@ pub(crate) struct AppArgs {
 pub(crate) struct McpArgs {
     /// Serve a running app's control channel at this port or host:port instead of an in-process
     /// engine; conflicts with --demo, which starts only that engine
-    #[arg(long, value_name = "PORT", value_parser = control_target, conflicts_with_all = ["demo", "automation_read_root", "automation_write_root"])]
-    pub(crate) connect: Option<ControlTarget>,
+    #[arg(long, value_name = "PORT", conflicts_with_all = ["demo", "automation_read_root", "automation_write_root"], value_parser = connect_target)]
+    pub(crate) connect: Option<String>,
     /// Start the in-process engine from the demo session
     #[arg(long)]
     pub(crate) demo: bool,

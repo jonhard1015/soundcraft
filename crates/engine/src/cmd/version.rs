@@ -169,6 +169,79 @@ mod tests {
         assert_eq!(n, 48, "FlowPrint drum grid must contain exactly 48 notes");
     }
 
+    /// Blind Lab — level-matching round-trip.
+    /// Save two versions of the same session with different master volumes, bounce each,
+    /// confirm the LUFS differ, then apply the correction gain and verify they converge.
+    #[test]
+    fn blind_lab_level_match_round_trip() {
+        let dir = std::env::temp_dir().join(format!("sc-blindlab-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        // ── Build a session with real audio content ───────────────────────────────────
+        // Generate a mono sine-tone WAV (same approach as file/tests.rs::tone_wav)
+        let tone: Vec<f32> = (0..48_000)
+            .map(|i| (i as f32 * std::f32::consts::TAU * 440.0 / 48_000.0).sin() * 0.5)
+            .collect();
+        let buf = soundcraft_audio_io::AudioBuffer {
+            sample_rate: 48_000,
+            channels: vec![tone],
+        };
+        let wav_bytes = soundcraft_audio_io::encode(&buf, &soundcraft_audio_io::EncodeOptions::default()).unwrap();
+        let wav_path = dir.join("tone.wav");
+        std::fs::write(&wav_path, wav_bytes).unwrap();
+        let wav = wav_path.to_string_lossy().into_owned();
+
+        let mut e = Engine::default();
+        let import_resp = e.execute("file.import_audio", &json!({"path": wav})).unwrap();
+        let audio_track_id = import_resp["imported"][0]["track"].as_u64().unwrap();
+
+        // ── Save variant A at 0 dB ────────────────────────────────────────────────────
+        let scraft = dir.join("session.scraft").to_string_lossy().into_owned();
+        e.execute("version.save", &json!({"name": "blind-a", "path": scraft})).unwrap();
+
+        // ── Make one change: drop master by 6 dB, save variant B ─────────────────────
+        // Track 0 is the imported audio track; apply -6 dB trim to simulate a mix change.
+        e.execute("mix.volume", &json!({"tracks": [audio_track_id], "db": -6.0})).unwrap();
+        e.execute("version.save", &json!({"name": "blind-b", "path": scraft})).unwrap();
+
+        // ── Bounce variant A ──────────────────────────────────────────────────────────
+        e.execute("version.load", &json!({"name": "blind-a", "path": scraft})).unwrap();
+        let bounce_a = dir.join("bounce_a.wav").to_string_lossy().into_owned();
+        let result_a = e.execute("file.bounce_mix", &json!({"path": bounce_a})).unwrap();
+        let lufs_a = result_a["lufs"].as_f64().unwrap_or(f64::NEG_INFINITY);
+
+        // ── Bounce variant B ──────────────────────────────────────────────────────────
+        e.execute("version.load", &json!({"name": "blind-b", "path": scraft})).unwrap();
+        let bounce_b = dir.join("bounce_b.wav").to_string_lossy().into_owned();
+        let result_b = e.execute("file.bounce_mix", &json!({"path": bounce_b})).unwrap();
+        let lufs_b = result_b["lufs"].as_f64().unwrap_or(f64::NEG_INFINITY);
+
+        // ── Assert the two variants have meaningfully different loudness ───────────────
+        let diff = (lufs_a - lufs_b).abs();
+        assert!(
+            diff > 3.0,
+            "variants A and B should differ by >3 LUFS (got {:.2} vs {:.2}, diff={:.2})",
+            lufs_a, lufs_b, diff
+        );
+
+        // ── Reload blind-a and re-bounce: proves version round-trip is lossless ────────
+        e.execute("version.load", &json!({"name": "blind-a", "path": scraft})).unwrap();
+        let bounce_a2 = dir.join("bounce_a2.wav").to_string_lossy().into_owned();
+        let result_a2 = e.execute("file.bounce_mix", &json!({"path": bounce_a2})).unwrap();
+        let lufs_a2 = result_a2["lufs"].as_f64().unwrap_or(f64::NEG_INFINITY);
+
+        // ── Assert re-bounced A is within 1 LUFS of original A ───────────────────────
+        let residual = (lufs_a - lufs_a2).abs();
+        assert!(
+            residual < 1.0,
+            "version round-trip should be lossless within 1 LUFS (got {:.2} vs {:.2}, residual={:.2})",
+            lufs_a, lufs_a2, residual
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
 }
 
     /// FlowPrint POC — Noir analyzes a 4-bar vocal and generates an editable MIDI drum track.

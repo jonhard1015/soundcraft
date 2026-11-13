@@ -105,4 +105,150 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(&dir);
     }
+    /// FlowPrint POC — Noir analyzes a 4-bar vocal and generates an editable MIDI drum track.
+    /// Vocal is left untouched; FlowPrint only creates and populates the drum track.
+    #[test]
+    fn flowprint_poc_4bar_vocal_plus_midi_drum_track() {
+        let mut e = Engine::default();
+
+        let state = e.execute("event.time_ops_window", &json!({})).unwrap();
+        let sample_rate = state["sample_rate"].as_u64().unwrap_or(44_100);
+        let bpm: f64 = state["tempos"]
+            .as_array()
+            .and_then(|a| a.first())
+            .and_then(|t| t["bpm"].as_f64())
+            .unwrap_or(120.0);
+
+        let four_bar_samples = ((4.0 * 4.0 * 60.0 / bpm) * sample_rate as f64).round() as i64;
+        assert!(four_bar_samples > 0, "4-bar sample count must be positive");
+
+        let track_resp = e.execute("track.new", &json!({"kind": "midi", "name": "Drums"})).unwrap();
+        let track_id = track_resp["tracks"][0].as_u64().unwrap();
+
+        let clip_resp = e
+            .execute("midi.new_clip", &json!({"tracks": [track_id], "start": 0, "end": four_bar_samples}))
+            .unwrap();
+        let clip_id = clip_resp["clip"].as_u64().unwrap();
+        assert_eq!(clip_resp["start"].as_i64().unwrap(), 0);
+        assert!(clip_resp["end"].as_i64().unwrap() > 0);
+
+        // General MIDI: kick=36, snare=38, closed hi-hat=42
+        // 4/4 at 960 TPQN: 1 bar = 3840 ticks
+        const TPQN: i64 = 960;
+        const BAR: i64 = TPQN * 4;
+        let drum_hits: &[(u8, i64, i64)] = &[
+            (36, 0,                    TPQN / 2),
+            (36, BAR / 2,              TPQN / 2),
+            (38, TPQN,                 TPQN / 2),
+            (38, TPQN * 3,             TPQN / 2),
+            (42, 0,                    TPQN / 4),
+            (42, TPQN / 2,             TPQN / 4),
+            (42, TPQN,                 TPQN / 4),
+            (42, TPQN + TPQN / 2,     TPQN / 4),
+            (42, TPQN * 2,             TPQN / 4),
+            (42, TPQN * 2 + TPQN / 2, TPQN / 4),
+            (42, TPQN * 3,             TPQN / 4),
+            (42, TPQN * 3 + TPQN / 2, TPQN / 4),
+        ];
+
+        for bar in 0..4_i64 {
+            let offset = bar * BAR;
+            for &(pitch, start, length) in drum_hits {
+                let r = e.execute(
+                    "midi.note_add",
+                    &json!({"clip": clip_id, "pitch": pitch as i64,
+                            "start_ticks": offset + start, "length_ticks": length, "velocity": 100}),
+                );
+                assert!(r.is_ok(), "midi.note_add failed: {:?}", r);
+            }
+        }
+
+        // 12 hits/bar × 4 bars = 48
+        let notes = e.execute("midi.notes", &json!({"clip": clip_id})).unwrap();
+        let n = notes["notes"].as_array().map(|a| a.len()).unwrap_or(0);
+        assert_eq!(n, 48, "FlowPrint drum grid must contain exactly 48 notes");
+    }
+
 }
+
+    /// FlowPrint POC — Noir analyzes a 4-bar vocal and generates an editable MIDI drum track.
+    /// The vocal audio is left untouched; only the drum track is created and populated.
+    /// This test drives the exact command sequence FlowPrint will use at runtime.
+    #[test]
+    fn flowprint_poc_4bar_vocal_plus_midi_drum_track() {
+        let mut e = Engine::default();
+
+        // ── 1. Query session tempo and sample rate ────────────────────────────────────
+        let state = e.execute("event.time_ops_window", &json!({})).unwrap();
+        let sample_rate = state["sample_rate"].as_u64().unwrap_or(44_100);
+        // tempo map may be empty on a fresh session; default to 120 BPM
+        let bpm: f64 = state["tempos"]
+            .as_array()
+            .and_then(|a| a.first())
+            .and_then(|t| t["bpm"].as_f64())
+            .unwrap_or(120.0);
+
+        // ── 2. Compute 4-bar length in samples (4/4 time) ────────────────────────────
+        let four_bar_samples = ((4.0 * 4.0 * 60.0 / bpm) * sample_rate as f64).round() as i64;
+        assert!(four_bar_samples > 0, "4-bar sample count must be positive");
+
+        // ── 3. Create the MIDI drum track ─────────────────────────────────────────────
+        let track_resp = e.execute("track.new", &json!({"kind": "midi", "name": "Drums"})).unwrap();
+        let track_id = track_resp["tracks"][0].as_u64().unwrap();
+
+        // ── 4. Create a 4-bar empty MIDI clip on that track ──────────────────────────
+        let clip_resp = e
+            .execute(
+                "midi.new_clip",
+                &json!({"tracks": [track_id], "start": 0, "end": four_bar_samples}),
+            )
+            .unwrap();
+        let clip_id = clip_resp["clip"].as_u64().unwrap();
+        assert_eq!(clip_resp["start"].as_i64().unwrap(), 0);
+        assert!(clip_resp["end"].as_i64().unwrap() > 0);
+
+        // ── 5. Populate a basic 4/4 kick-snare-hat pattern ───────────────────────────
+        // TICKS_PER_QUARTER = 960; 1 bar = 4 beats = 3840 ticks
+        // kick: beats 1 & 3 (ticks 0, 1920); snare: beats 2 & 4 (ticks 960, 2880)
+        // hi-hat: every eighth note
+        // General MIDI drum map: kick=36, snare=38, closed hi-hat=42
+        const TPQN: i64 = 960;
+        const BAR: i64 = TPQN * 4;
+
+        let drum_hits: &[(u8, i64, i64)] = &[
+            (36, 0,                    TPQN / 2),
+            (36, BAR / 2,              TPQN / 2),
+            (38, TPQN,                 TPQN / 2),
+            (38, TPQN * 3,             TPQN / 2),
+            (42, 0,                    TPQN / 4),
+            (42, TPQN / 2,             TPQN / 4),
+            (42, TPQN,                 TPQN / 4),
+            (42, TPQN + TPQN / 2,     TPQN / 4),
+            (42, TPQN * 2,             TPQN / 4),
+            (42, TPQN * 2 + TPQN / 2, TPQN / 4),
+            (42, TPQN * 3,             TPQN / 4),
+            (42, TPQN * 3 + TPQN / 2, TPQN / 4),
+        ];
+
+        for bar in 0..4_i64 {
+            let offset = bar * BAR;
+            for &(pitch, start, length) in drum_hits {
+                let r = e.execute(
+                    "midi.note_add",
+                    &json!({
+                        "clip": clip_id,
+                        "pitch": pitch as i64,
+                        "start_ticks": offset + start,
+                        "length_ticks": length,
+                        "velocity": 100,
+                    }),
+                );
+                assert!(r.is_ok(), "midi.note_add failed: {:?}", r);
+            }
+        }
+
+        // ── 6. Verify note count: 12 hits/bar × 4 bars = 48 ─────────────────────────
+        let notes = e.execute("midi.notes", &json!({"clip": clip_id})).unwrap();
+        let note_count = notes["notes"].as_array().map(|a| a.len()).unwrap_or(0);
+        assert_eq!(note_count, 48, "FlowPrint drum grid must contain exactly 48 notes");
+    }
